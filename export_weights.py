@@ -21,24 +21,3 @@ for name, param in state_dict.items():
     
     # 保存为 CSV 文件
     pd.DataFrame(param_np).to_csv(f'./weights/{name}.csv', header=False, index=False)
-
-# # 创建一个空的DataFrame来存储权重数据
-# weights_data = pd.DataFrame(columns=['Layer Name', 'Weight Shape', 'Weights'])
-
-# # 遍历state_dict，将权重值添加到DataFrame中
-# for key, value in state_dict.items():
-#     if isinstance(value, torch.Tensor):
-#         weights_data = pd.concat([
-#             weights_data,
-#             pd.DataFrame({
-#                 'Layer Name': [key],
-#                 'Weight Shape': [tuple(value.shape)],
-#                 'Weights': [value.flatten().numpy()]  # 将权重展平为一维数组并转换为NumPy数组
-#             })
-#         ], ignore_index=True)
-
-# # 保存DataFrame为CSV文件
-# csv_filename = 'weights_export.csv'
-# weights_data.to_csv(csv_filename, index=False)
-
-# print(f"Exported weights to {csv_filename}")

@@ -11,7 +11,7 @@ import os
 import argparse
 
 from resnet20 import *
-from utils import progress_bar
+from utils import progress_bar, kaiming_initialization
 
 parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')
 parser.add_argument('--opt', default = 'adam', type = str, help = 'sgd or adam or adamw')
@@ -54,6 +54,7 @@ testloader = torch.utils.data.DataLoader(testset, batch_size = 512, shuffle = Fa
 print('==> Building model..')
 
 net = resnet20()
+kaiming_initialization(net)
 
 net = net.to(device)
 if device == 'cuda':

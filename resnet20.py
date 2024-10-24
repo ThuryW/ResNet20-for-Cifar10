@@ -1,11 +1,6 @@
-import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
-import torch.optim as optim
 import torch.nn.init as init
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 
 def _weights_init(m):
     classname = m.__class__.__name__

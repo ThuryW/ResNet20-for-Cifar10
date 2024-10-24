@@ -229,3 +229,16 @@ class AvgMeter(object):
     def avg(self):
         assert self.cnt != 0
         return self.sum / self.cnt
+    
+def kaiming_initialization(model):
+    for layer in model.modules():
+        if isinstance(layer, nn.Conv2d):
+            # Kaiming 初始化对于卷积层
+            nn.init.kaiming_uniform_(layer.weight, nonlinearity='relu')
+            if layer.bias is not None:
+                nn.init.zeros_(layer.bias)  # 初始化偏置为0
+        elif isinstance(layer, nn.Linear):
+            # Kaiming 初始化对于全连接层
+            nn.init.kaiming_uniform_(layer.weight, nonlinearity='relu')
+            if layer.bias is not None:
+                nn.init.zeros_(layer.bias)  # 初始化偏置为0
