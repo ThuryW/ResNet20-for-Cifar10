@@ -14,3 +14,6 @@ Save the model weights in csv files
 ```shell
 python export_weights.py
 ```
+
+### Train result
+The best Top-1 accuracy I get is 92.23%

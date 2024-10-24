@@ -17,8 +17,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 def load_test_data(args):
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
 
     testset = torchvision.datasets.CIFAR10(root = './data', train = False, transform = transform_test)

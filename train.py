@@ -16,8 +16,8 @@ from utils import progress_bar, kaiming_initialization
 parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')
 parser.add_argument('--opt', default = 'adam', type = str, help = 'sgd or adam or adamw')
 parser.add_argument('--scheduler', default = 'no', type = str, help = 'no or cos or step')
-parser.add_argument('--lr', default = 0.001, type = float, help = 'learning rate')
-parser.add_argument('--batch_size', default = 256, type = int, help = 'train batch size')
+parser.add_argument('--lr', default = 0.00001, type = float, help = 'learning rate')
+parser.add_argument('--batch_size', default = 2048, type = int, help = 'train batch size')
 parser.add_argument('--ep', default = 200, type = int, help = 'epoch')
 parser.add_argument('--wd', default = 5e-4, type = float, help = 'weight decay')
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
@@ -33,14 +33,12 @@ transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ])
 
 transform_test = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
 ])
 
 
