@@ -5,9 +5,9 @@ import pandas as pd
 
 torch.set_printoptions(threshold=sys.maxsize) # 显示所有的元素，不会有省略号出现
 np.set_printoptions(threshold=np.inf)
-checkpoint_path = '/home/wangtianyu/pytorch_resnet_cifar10/save_resnet20/checkpoint.th'
+checkpoint_path = './checkpoint/ckpt.pth'
 checkpoint = torch.load(checkpoint_path, map_location='cpu')
-state_dict = checkpoint['state_dict']
+state_dict = checkpoint['net']
 
 for name, param in state_dict.items():
     param_np = param.numpy()
