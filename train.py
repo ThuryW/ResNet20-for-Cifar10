@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 import os
 import argparse
 
-from resnet20 import *
+from model.resnet20 import *
 from utils import progress_bar, kaiming_initialization
 
 parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')

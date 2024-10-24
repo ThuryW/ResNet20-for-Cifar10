@@ -9,7 +9,7 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 
-from resnet20 import *
+from model.resnet20 import *
 from utils import AvgMeter
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
