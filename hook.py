@@ -43,21 +43,22 @@ def get_bn_output(module, input, output):
     print("Number of Channels:", num_channels)
 
     # 获取通道0的输出
-    channel_0_output = output[:, 0, :, :].detach().cpu().numpy()  # 将输出转换为 NumPy 数组
-    print("Channel 0 Batch Norm Output Shape:", channel_0_output.shape)
+    for channel in range(16):
+        channel_output = output[:, channel, :, :].detach().cpu().numpy()  # 将输出转换为 NumPy 数组
+        # print(f"Channel {channel} Batch Norm Output Shape:", channel_output.shape)
 
-    # 计算输出的均值、方差、最大值和最小值
-    mean = channel_0_output.mean()
-    variance = channel_0_output.var()
-    max_value = channel_0_output.max()
-    min_value = channel_0_output.min()
+        # 计算输出的均值、方差、最大值和最小值
+        mean = channel_output.mean()
+        variance = channel_output.var()
+        max_value = channel_output.max()
+        min_value = channel_output.min()
+        
+        print(f"Channel {channel} Batch Norm Output Mean: {mean:.4f}, Variance: {variance:.4f}, Max: {max_value:.4f}, Min: {min_value:.4f}")
     
-    print(f"Channel 0 Batch Norm Output Mean: {mean:.4f}, Variance: {variance:.4f}, Max: {max_value:.4f}, Min: {min_value:.4f}")
     
-    
-    # 将数据写入 CSV 文件
-    df = pd.DataFrame(channel_0_output.reshape(-1, channel_0_output.shape[2]))  # 展平通道
-    df.to_csv('./hook_files/bn_channel_0_output.csv', index=False)
+    # # 将数据写入 CSV 文件
+    # df = pd.DataFrame(channel_output.reshape(-1, channel_output.shape[2]))  # 展平通道
+    # df.to_csv('./hook_files/bn_channel_output.csv', index=False)
 
 # 绑定钩子到 BN 层
 if device == 'cuda':
