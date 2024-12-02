@@ -3,11 +3,11 @@
 Just run
 ```shell
 python train.py # --lr 0.001 ...
-python test.py
+python test.py  # --path ./checkpoint/yourfilename
 ```
-You can add args if you wanna change hyperparameters, see `train.py` 
+You can add args if you wanna change hyperparameters, see `train.py`.
 
-Use `-r` to resume from checkpoint
+Use `-r` to resume from checkpoint.
 
 ### Export weights
 Save the model weights in csv files
@@ -16,4 +16,9 @@ python export_weights.py
 ```
 
 ### Train result
-The best Top-1 accuracy I get is 92.23%
+
+|Network | Top-1 accuracy |
+|:------:|:------:|
+|ResNet20| 92.23% |
+|ResNet32| 92.23% |
+|ResNet44| 92.23% |

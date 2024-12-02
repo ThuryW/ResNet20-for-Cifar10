@@ -10,13 +10,13 @@ import torchvision.transforms as transforms
 import os
 import argparse
 
-from model.resnet20 import *
+from model.resnet import *
 from utils import progress_bar, kaiming_initialization
 
 parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')
 parser.add_argument('--opt', default = 'adam', type = str, help = 'sgd or adam or adamw')
 parser.add_argument('--scheduler', default = 'no', type = str, help = 'no or cos or step')
-parser.add_argument('--lr', default = 0.00001, type = float, help = 'learning rate')
+parser.add_argument('--lr', default = 0.0001, type = float, help = 'learning rate')
 parser.add_argument('--batch_size', default = 2048, type = int, help = 'train batch size')
 parser.add_argument('--ep', default = 200, type = int, help = 'epoch')
 parser.add_argument('--wd', default = 5e-4, type = float, help = 'weight decay')
@@ -51,7 +51,7 @@ testloader = torch.utils.data.DataLoader(testset, batch_size = 512, shuffle = Fa
 # Model
 print('==> Building model..')
 
-net = resnet20()
+net = resnet32()
 kaiming_initialization(net)
 
 net = net.to(device)

@@ -3,7 +3,7 @@ import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import DataLoader, Subset
-from model.resnet20 import *
+from model.resnet import *
 import pandas as pd
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -11,7 +11,7 @@ model = resnet20()
 print(f"Using device: {device}")
 
 # 加载训练后的模型权重
-checkpoint = torch.load('./checkpoint/ckpt_92.23.pth', map_location=device)
+checkpoint = torch.load('./checkpoint/20_ckpt_92.23.pth', map_location=device)
 # checkpoint = torch.load('./checkpoint/ckpt.pth', map_location=device)
 
 model = model.to(device)
@@ -108,7 +108,7 @@ def get_layer_output(module, input, output):
 if device == 'cuda':
     hook = model.module.layer1[0].bn1.register_forward_hook(get_bn_output)
 else:
-    hook = model.layer3.register_forward_hook(get_layer_output)
+    hook = model.bn1.register_forward_hook(get_layer_output)
 
 
 # 定义 CIFAR-10 数据集的转换
@@ -118,7 +118,7 @@ transform = transforms.Compose([
 ])
 
 # 下载 CIFAR-10 数据集
-train_dataset = datasets.CIFAR10(root='./data', train=True, download=False, transform=transform)
+train_dataset = datasets.CIFAR10(root='./data', train=False, download=False, transform=transform)
 
 # 选择前 227 张图片
 subset_indices = list(range(227))

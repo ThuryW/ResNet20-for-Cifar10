@@ -1,5 +1,5 @@
 data/
-weights/
+weights*/
 checkpoint/
 __pycache__/
 hook_files/

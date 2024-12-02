@@ -9,7 +9,7 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 
-from model.resnet20 import *
+from model.resnet import *
 from utils import AvgMeter
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -26,7 +26,7 @@ def load_test_data(args):
     return testloader
 
 def test_process(args, test_loader):
-    net = resnet20()
+    net = resnet32()
     net = net.to(device)
     if device == 'cuda':
         net = torch.nn.DataParallel(net)
@@ -66,7 +66,7 @@ def test_result(start_time, test_loss, test_acc):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Test')
     parser.add_argument('--batch_size', default = 256, type = int, help = 'test batch size')
-    parser.add_argument('--path', default = './checkpoint/ckpt.pth', type = str, help = 'test model path')
+    parser.add_argument('--path', default = '/home/wangtianyu/my_resnet20/checkpoint/ckpt.pth', type = str, help = 'test model path')
     args = parser.parse_args()
 
     test_loader = load_test_data(args)
