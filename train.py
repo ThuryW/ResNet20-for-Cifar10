@@ -16,8 +16,8 @@ from utils import progress_bar, kaiming_initialization
 parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')
 parser.add_argument('--opt', default = 'adam', type = str, help = 'sgd or adam or adamw')
 parser.add_argument('--scheduler', default = 'no', type = str, help = 'no or cos or step')
-parser.add_argument('--lr', default = 0.0001, type = float, help = 'learning rate')
-parser.add_argument('--batch_size', default = 2048, type = int, help = 'train batch size')
+parser.add_argument('--lr', default = 0.001, type = float, help = 'learning rate')
+parser.add_argument('--batch_size', default = 128, type = int, help = 'train batch size')
 parser.add_argument('--ep', default = 200, type = int, help = 'epoch')
 parser.add_argument('--wd', default = 5e-4, type = float, help = 'weight decay')
 parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
@@ -52,7 +52,7 @@ testloader = torch.utils.data.DataLoader(testset, batch_size = 512, shuffle = Fa
 print('==> Building model..')
 
 net = resnet32()
-kaiming_initialization(net)
+# kaiming_initialization(net)
 
 net = net.to(device)
 if device == 'cuda':
@@ -73,7 +73,7 @@ else:
 if args.scheduler == 'cos':
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.ep)
 elif args.scheduler == 'step':
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 10, gamma = 0.8)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 40, gamma = 0.1)
 else:
     scheduler = None
 
