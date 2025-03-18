@@ -20,5 +20,3 @@ python export_weights.py
 |Network | Top-1 accuracy |
 |:------:|:------:|
 |ResNet20| 92.23% |
-|ResNet32| TBD |
-|ResNet44| TBD |
