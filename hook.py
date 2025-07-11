@@ -6,11 +6,14 @@ from torch.utils.data import DataLoader, Subset
 from model.resnet import *
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+# model = resnet20()
 model = resnet32()
+# model = resnet44()
 print(f"Using device: {device}")
 
 # 加载训练后的模型权重
-checkpoint = torch.load('/home/wangtianyu/pytorch_resnet_cifar10/save_resnet32/model.th', map_location=device)
+checkpoint = torch.load('/home/wangtianyu/pytorch_resnet_cifar100/save_resnet32/model_70.20.th', map_location=device)
+# checkpoint = torch.load('/home/wangtianyu/my_resnet20/checkpoint/20_ckpt_92.23.pth', map_location=device)
 
 model = model.to(device)
 if device == 'cuda':
@@ -134,9 +137,42 @@ def get_layer_input_all(module, input, output):
 if device == 'cuda':
     hook = model.module.layer1[1].bn1.register_forward_hook(get_layer_output)
 else:
-    # hook = model.layer3[2].bn2.register_forward_hook(get_layer_output_all)
-    hook = model.layer3[2].conv1.register_forward_hook(get_layer_input_all)
+    # hook1 = model.bn1.register_forward_hook(get_layer_output_all)
+    # hook1 = model.layer1[0].bn1.register_forward_hook(get_layer_output_all)
+    # hook2 = model.layer1[1].bn1.register_forward_hook(get_layer_output_all)
+    # hook3 = model.layer1[2].bn1.register_forward_hook(get_layer_output_all)
+    # hook4 = model.layer1[3].bn1.register_forward_hook(get_layer_output_all)
+    # hook5 = model.layer1[4].bn1.register_forward_hook(get_layer_output_all)
 
+    # hook1 = model.layer2[0].bn1.register_forward_hook(get_layer_output_all)
+    # hook2 = model.layer2[1].bn1.register_forward_hook(get_layer_output_all)
+    # hook3 = model.layer2[2].bn1.register_forward_hook(get_layer_output_all)
+    # hook4 = model.layer2[3].bn1.register_forward_hook(get_layer_output_all)
+    # hook5 = model.layer2[4].bn1.register_forward_hook(get_layer_output_all)
+    
+    # hook1 = model.layer3[0].bn1.register_forward_hook(get_layer_output_all)
+    # hook2 = model.layer3[1].bn1.register_forward_hook(get_layer_output_all)
+    # hook3 = model.layer3[2].bn1.register_forward_hook(get_layer_output_all)
+    # hook4 = model.layer3[3].bn1.register_forward_hook(get_layer_output_all)
+    # hook5 = model.layer3[4].bn1.register_forward_hook(get_layer_output_all)
+
+    # hook1 = model.layer1[1].conv1.register_forward_hook(get_layer_input_all)
+    # hook2 = model.layer1[2].conv1.register_forward_hook(get_layer_input_all)
+    # hook3 = model.layer1[3].conv1.register_forward_hook(get_layer_input_all)
+    # hook4 = model.layer1[4].conv1.register_forward_hook(get_layer_input_all)
+    # hook5 = model.layer2[0].conv1.register_forward_hook(get_layer_input_all)
+
+    # hook1 = model.layer2[1].conv1.register_forward_hook(get_layer_input_all)
+    # hook2 = model.layer2[2].conv1.register_forward_hook(get_layer_input_all)
+    # hook3 = model.layer2[3].conv1.register_forward_hook(get_layer_input_all)
+    # hook4 = model.layer2[4].conv1.register_forward_hook(get_layer_input_all)
+    # hook5 = model.layer3[0].conv1.register_forward_hook(get_layer_input_all)
+
+    hook1 = model.layer3[1].conv1.register_forward_hook(get_layer_input_all)
+    hook2 = model.layer3[2].conv1.register_forward_hook(get_layer_input_all)
+    hook3 = model.layer3[3].conv1.register_forward_hook(get_layer_input_all)
+    hook4 = model.layer3[4].conv1.register_forward_hook(get_layer_input_all)
+    hook5 = model.layer3[0].conv1.register_forward_hook(get_layer_input_all)
 
 # 定义 CIFAR-10 数据集的转换
 transform = transforms.Compose([
@@ -146,13 +182,13 @@ transform = transforms.Compose([
 ])
 
 # 下载 CIFAR-10 数据集
-train_dataset = datasets.CIFAR10(root='./data', train=False, download=False, transform=transform)
+train_dataset = datasets.CIFAR100(root='./data', train=False, download=False, transform=transform)
 
-# # 选择前 227 张图片
-# start_image = 2497
-# subset_indices = list(range(start_image, start_image + 227))
-# train_subset = Subset(train_dataset, subset_indices)
-# train_loader = DataLoader(train_subset, batch_size=227, shuffle=False)
+# 选择前 227 张图片
+start_image = 0
+subset_indices = list(range(start_image, start_image + 227))
+train_subset = Subset(train_dataset, subset_indices)
+train_loader = DataLoader(train_subset, batch_size=227, shuffle=False)
 
 # 使用整个数据集进行推理
 train_loader = DataLoader(train_dataset, batch_size=10000, shuffle=False)
@@ -160,6 +196,13 @@ train_loader = DataLoader(train_dataset, batch_size=10000, shuffle=False)
 # 获取一个批次的数据
 dataiter = iter(train_loader)
 images, labels = next(dataiter)
+
+# # 获取标签对应的类别名称
+# class_names = train_dataset.classes
+
+# # 打印该批次每个图像的标签及其对应的类别
+# for label in labels:
+#     print(f"Label: {label}, Class Name: {class_names[label]}")
 
 # 将数据移动到指定设备
 images = images.to(device)
@@ -169,4 +212,4 @@ with torch.no_grad():  # 不计算梯度
     model(images)
 
 # 移除钩子
-hook.remove()
+# hook.remove()

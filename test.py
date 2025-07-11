@@ -10,6 +10,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 from model.resnet import *
+from model.squeezeNet import *
 from utils import AvgMeter
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -17,15 +18,15 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 def load_test_data(args):
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
     ])
 
     testset = torchvision.datasets.CIFAR10(root = './data', train = False, transform = transform_test)
     testloader = torch.utils.data.DataLoader(testset, batch_size = args.batch_size, shuffle = False, num_workers = 2)
 
     # 只取前227张图片的索引
-    start_image = 6129
+    start_image = 1135
     subset_indices = list(range(start_image, start_image + 227))  # 选择227张图片
 
     # 创建Subset数据集
@@ -37,14 +38,14 @@ def load_test_data(args):
     return testloader, subset_loader
 
 def test_process(args, test_loader):
-    net = resnet44()
+    net = resnet20()
     net = net.to(device)
     if device == 'cuda':
         net = torch.nn.DataParallel(net)
         cudnn.benchmark = True
-    
+
     checkpoint = torch.load(args.path)
-    net.load_state_dict(checkpoint['state_dict'])
+    net.load_state_dict(checkpoint['net'])
     # best_epoch = checkpoint['epoch']
     # print('best epoch:', best_epoch)
 
@@ -76,13 +77,14 @@ def test_result(start_time, test_loss, test_acc):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Test')
-    parser.add_argument('--batch_size', default = 256, type = int, help = 'test batch size')
-    parser.add_argument('--path', default = '/home/wangtianyu/pytorch_resnet_cifar10/pretrained_models/resnet44-014dd654.th', type = str, help = 'test model path')
+    parser.add_argument('--batch_size', default = 512, type = int, help = 'test batch size')
+    parser.add_argument('--path', default = '/home/wangtianyu/my_resnet20/checkpoint/20_ckpt_92.23.pth', type = str, help = 'test model path')
     args = parser.parse_args()
 
     test_loader, subset_loader = load_test_data(args)
 
     start_time = time.time()
+    # test_loss, test_acc = test_process(args, subset_loader)
     test_loss, test_acc = test_process(args, test_loader)
     
     test_result(start_time, test_loss, test_acc)
