@@ -4,3 +4,4 @@ checkpoint/
 __pycache__/
 hook_files/
 train_tmp_ckpt/
+pruned_checkpoints/
