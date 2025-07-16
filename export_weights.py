@@ -5,9 +5,9 @@ import pandas as pd
 
 torch.set_printoptions(threshold=sys.maxsize) # 显示所有的元素，不会有省略号出现
 np.set_printoptions(threshold=np.inf)
-checkpoint_path = '/home/wangtianyu/pytorch_resnet_cifar100/save_resnet32/model_70.20.th'
+checkpoint_path = '/home/wangtianyu/my_resnet20/pruned_checkpoints/resnet20_pruned_finetuned_prune80_ft10.pth'
 checkpoint = torch.load(checkpoint_path, map_location='cpu')
-state_dict = checkpoint['state_dict']
+state_dict = checkpoint['net']
 
 for name, param in state_dict.items():
     param_np = param.numpy()
@@ -20,4 +20,4 @@ for name, param in state_dict.items():
         param_np = param_np.reshape(1, 1)
     
     # 保存为 CSV 文件
-    pd.DataFrame(param_np).to_csv(f'./weights_32_cifar100/{name}.csv', header=False, index=False)
+    pd.DataFrame(param_np).to_csv(f'/home/wangtianyu/my_resnet20/weights/prune/weights_20/{name}.csv', header=False, index=False)

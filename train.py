@@ -1,4 +1,8 @@
-'''Train CIFAR10 with PyTorch.'''
+import argparse
+import time
+import os
+from tqdm import tqdm
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -7,140 +11,196 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torchvision.transforms as transforms
 
-import os
-import argparse
+# Assuming your resnet20 model definition is in model/resnet.py
+from model.resnet import resnet20 
 
-from model.resnet import *
-from model.squeezeNet import *
-from utils import progress_bar, kaiming_initialization
+# Define AvgMeter utility class (copied directly for completeness)
+class AvgMeter(object):
+    def __init__(self):
+        self.reset()
 
-parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Training')
-parser.add_argument('--opt', default = 'adam', type = str, help = 'sgd or adam or adamw')
-parser.add_argument('--scheduler', default = 'no', type = str, help = 'no or cos or step')
-parser.add_argument('--lr', default = 0.001, type = float, help = 'learning rate')
-parser.add_argument('--batch_size', default = 512, type = int, help = 'train batch size')
-parser.add_argument('--ep', default = 200, type = int, help = 'epoch')
-parser.add_argument('--wd', default = 5e-4, type = float, help = 'weight decay')
-parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
-args = parser.parse_args()
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
 
+    def add(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count if self.count != 0 else 0
+
+
+# Configure device
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-best_acc = 0  # best test accuracy
-start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
-# Data
-print('==> Preparing data..')
-transform_train = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-])
+# ==============================================================================
+# Data Loading Function
+# ==============================================================================
+def load_data(args):
+    """
+    Loads CIFAR-10 training and test datasets.
+    """
+    print('==> Preparing data..')
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
 
-transform_test = transforms.Compose([
-    transforms.ToTensor(),
-    # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
 
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
 
-trainset = torchvision.datasets.CIFAR10(root = './data', train = True, transform = transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size = args.batch_size, shuffle = True, num_workers = 2)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=2)
 
-testset = torchvision.datasets.CIFAR10(root = './data', train = False, transform = transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size = 512, shuffle = False, num_workers = 2)
+    return trainloader, testloader
 
-# Model
-print('==> Building model..')
+# ==============================================================================
+# Training Function
+# ==============================================================================
+def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val=0):
+    """
+    Trains the model for specified epochs.
+    """
+    print(f"\n--- Starting training for {args.epochs} epochs ---")
+    model.train() # Set to training mode
+    
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    criterion = nn.CrossEntropyLoss()
 
-# net = resnet32()
-net = SqueezeNet(num_classes=10)
-
-# kaiming_initialization(net)
-
-net = net.to(device)
-if device == 'cuda':
-    net = torch.nn.DataParallel(net)
-    cudnn.benchmark = True
-
-criterion = nn.CrossEntropyLoss()
-
-if args.opt == 'sgd':
-    optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.wd)
-elif args.opt == 'adam':
-    optimizer = optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.wd)
-elif args.opt == 'adamw':
-    optimizer = optim.AdamW(net.parameters(), lr=args.lr, weight_decay=args.wd)
-else:
-    raise ValueError("Wrong optimizer!")
-
-if args.scheduler == 'cos':
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.ep)
-elif args.scheduler == 'step':
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 40, gamma = 0.1)
-else:
-    scheduler = None
-
-if args.resume:
-    # Load checkpoint.
-    print('==> Resuming from checkpoint..')
-    assert os.path.isdir('checkpoint'), 'Error: no checkpoint directory found!'
-    checkpoint = torch.load('./checkpoint/ckpt.pth')
-    net.load_state_dict(checkpoint['net'])
-    best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
-
-for epoch in range(start_epoch, start_epoch + args.ep):
-    # Training
-    print('\nEpoch: %d' % epoch)
-    net.train()
-    train_loss = 0
-    correct = 0
-    total = 0
-    for batch_idx, (inputs, targets) in enumerate(trainloader):
-        inputs, targets = inputs.to(device), targets.to(device)
-        optimizer.zero_grad()
-        outputs = net(inputs)
-        loss = criterion(outputs, targets)
-        loss.backward()
-        optimizer.step()
-
-        train_loss += loss.item()
-        _, predicted = outputs.max(1)
-        total += targets.size(0)
-        correct += predicted.eq(targets).sum().item()
-
-        progress_bar(batch_idx, len(trainloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (train_loss/(batch_idx+1), 100.*correct/total, correct, total))
+    best_acc = 0 # Track best accuracy for saving
+    
+    for epoch in range(epoch_start_val, args.epochs):
+        print(f'Train Epoch: {epoch+1}/{args.epochs}')
+        loss_meter = AvgMeter()
+        acc_meter = AvgMeter()
         
-    # Test
-    net.eval()
-    test_loss = 0
-    correct = 0
-    total = 0
+        with tqdm(total=len(train_loader), desc=f"Train Epoch {epoch+1}") as pbar:
+            for batch_idx, (inputs, targets) in enumerate(train_loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, targets.long())
+                loss.backward()
+                optimizer.step()
+
+                loss_meter.add(loss.item(), inputs.size(0))
+                acc = (outputs.argmax(dim=-1).long() == targets).float().mean()
+                acc_meter.add(acc.item(), inputs.size(0))
+
+                pbar.set_postfix({'loss': loss_meter.avg, 'acc': acc_meter.avg * 100})
+                pbar.update(1)
+
+        scheduler.step()
+        print(f"Train Epoch {epoch+1} finished. Loss: {loss_meter.avg:.4f}, Acc: {acc_meter.avg * 100:.2f}%")
+        
+        # Evaluate after each epoch to find best model
+        current_loss, current_acc = test_model(model, test_loader_for_eval, f"Epoch {epoch+1} Test") # Pass test_loader_for_eval here
+        
+        # Save checkpoint if it's the best model so far
+        if current_acc > best_acc:
+            print(f"Saving best model with accuracy: {current_acc * 100:.2f}%")
+            state = {
+                'net': model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict(),
+                'acc': current_acc,
+                'epoch': epoch,
+            }
+            if not os.path.isdir('checkpoint'):
+                os.makedirs('checkpoint')
+            torch.save(state, f'./checkpoint/{args.epochs}_ckpt_{current_acc*100:.2f}.pth')
+            best_acc = current_acc
+
+    print("--- Training complete ---")
+    return model
+
+# ==============================================================================
+# Test Function
+# ==============================================================================
+def test_model(model, test_loader, description="Test"):
+    """
+    Evaluates model performance.
+    """
+    model.eval() # Set to evaluation mode
+    loss_meter = AvgMeter()
+    acc_meter = AvgMeter()
+    criterion = nn.CrossEntropyLoss()
+
+    print(f"\n--- Starting {description} ---")
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(testloader):
-            inputs, targets = inputs.to(device), targets.to(device)
-            outputs = net(inputs)
-            loss = criterion(outputs, targets)
+        for image_batch, gt_batch in tqdm(test_loader, desc=description):
+            image_batch, gt_batch = image_batch.to(device), gt_batch.to(device)
+            gt_batch = gt_batch.long()
+            pred_batch = model(image_batch)
+            loss = criterion(pred_batch, gt_batch)
+            loss_meter.add(loss.item(), image_batch.size(0))
+            acc = (pred_batch.argmax(dim=-1).long() == gt_batch).float().mean()
+            acc_meter.add(acc.item(), image_batch.size(0))
+    test_loss = loss_meter.avg
+    test_acc = acc_meter.avg
 
-            test_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+    print(f"--- {description} Result --- Loss: {test_loss:.4f}, Accuracy: {test_acc * 100:.2f}%")
+    return test_loss, test_acc
 
-            progress_bar(batch_idx, len(testloader), 'Loss: %.3f | Acc: %.3f%% (%d/%d)' % (test_loss/(batch_idx+1), 100.*correct/total, correct, total))
+# ==============================================================================
+# Main Function
+# ==============================================================================
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Pre-training for ResNet20')
+    parser.add_argument('--batch_size', default=256, type=int, help='batch size for data loaders')
+    parser.add_argument('--lr', default=0.01, type=float, help='learning rate')
+    parser.add_argument('--epochs', default=200, type=int, help='number of epochs to train')
+    parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
+    # New argument for specifying resume path
+    parser.add_argument('--resume_path', type=str, default=None, 
+                        help='Path to the .pth checkpoint file to resume from. Required if --resume is used.')
+    args = parser.parse_args()
 
-    # Save checkpoint.
-    acc = 100.*correct/total
-    if acc > best_acc:
-        print(f'Save best model @ Epoch {epoch}')
-        state = {
-            'net': net.state_dict(),
-            'acc': acc,
-            'epoch': epoch,
-        }
-        if not os.path.isdir('checkpoint'):
-            os.mkdir('checkpoint')
-        torch.save(state, './checkpoint/ckpt.pth')
-        best_acc = acc 
+    # Input validation for resume
+    if args.resume and args.resume_path is None:
+        parser.error("--resume requires --resume_path to be specified.")
+
+    # 1. Load Data
+    train_loader, test_loader = load_data(args)
+
+    # 2. Instantiate Model
+    print("\n--- Initializing ResNet20 model ---")
+    net = resnet20()
+    net = net.to(device)
+
+    start_epoch = 0
+    if args.resume:
+        # Load checkpoint from specified path
+        print(f'==> Resuming from checkpoint: {args.resume_path}..')
+        if not os.path.exists(args.resume_path):
+            print(f'Error: Checkpoint file not found at {args.resume_path}!')
+            exit() # Exit if file not found
+        
+        checkpoint = torch.load(args.resume_path)
+        net.load_state_dict(checkpoint['net'])
+        start_epoch = checkpoint['epoch'] + 1
+        print(f"Resumed from epoch {checkpoint['epoch']} with accuracy {checkpoint['acc'] * 100:.2f}%")
+
+    if device == 'cuda':
+        net = torch.nn.DataParallel(net)
+        cudnn.benchmark = True
+
+    # 3. Train the model
+    # Pass test_loader to train_model for per-epoch evaluation
+    trained_net = train_model(net, train_loader, args, test_loader, epoch_start_val=start_epoch)
+
+    # 4. Evaluate Final Trained Model Performance
+    print("\n--- Evaluating Final Trained Model ---")
+    final_loss, final_acc = test_model(trained_net, test_loader, "Final Trained Model Test")
+
+    print("\n--- Pre-training Process Complete ---")
+    print(f"Final Trained Model Accuracy: {final_acc * 100:.2f}%")
