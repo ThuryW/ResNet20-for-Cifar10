@@ -3,9 +3,7 @@ import torch.nn as nn
 import argparse
 import os
 
-# Assuming your resnet20 model definition is in model/resnet.py
-# Make sure this path is correct based on where you run the script
-from model.resnet import resnet20 
+from resnet import resnet20
 
 def calculate_sparsity(model_path):
     """

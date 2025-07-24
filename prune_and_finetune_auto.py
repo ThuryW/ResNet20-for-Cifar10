@@ -7,17 +7,16 @@ import torch.optim as optim
 import torch.nn.utils.prune as prune
 import torchvision
 import torchvision.transforms as transforms
-
-# Import datetime for timestamped directories
 from datetime import datetime
-import argparse # Import argparse
+import argparse
+import logging # Import logging module
+import sys     # Import sys for stdout
 
 # IMPORTANT: Directly import resnet20 from your model directory.
 # Ensure your 'model' directory is in the Python path or current working directory.
 try:
     from model.resnet import resnet20
 except ImportError:
-    # This error will occur if model/resnet.py is not found or resnet20 is not defined within it.
     print("Error: Could not import resnet20 from model/resnet.py.")
     print("Please ensure you have a 'model' directory in the same location as this script,")
     print("and that 'resnet.py' exists within it and defines a 'resnet20' function.")
@@ -50,7 +49,7 @@ class AvgMeter(object):
 # ==============================================================================
 def load_data(args):
     """Loads CIFAR-10 training and test datasets."""
-    print('==> Preparing data..')
+    logging.info('==> Preparing data..')
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -76,7 +75,7 @@ def load_data(args):
 # ==============================================================================
 def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val=0, save_dir=None):
     """Trains the model for specified epochs."""
-    print(f"\n--- Starting training for {args.epochs} total epochs ---")
+    logging.info(f"\n--- Starting training for {args.epochs} total epochs ---")
     model.train()
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
@@ -87,24 +86,24 @@ def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val
     
     # If resuming, load optimizer and scheduler states
     if args.resume and args.resume_path:
-        print(f"Loading optimizer and scheduler states from {args.resume_path}")
+        logging.info(f"Loading optimizer and scheduler states from {args.resume_path}")
         checkpoint = torch.load(args.resume_path, map_location=device)
         if 'optimizer' in checkpoint and 'scheduler' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer'])
             scheduler.load_state_dict(checkpoint['scheduler'])
             best_acc = checkpoint.get('acc', 0.0)
             epoch_start_val = checkpoint.get('epoch', 0) + 1 # Start from next epoch
-            print(f"Resumed optimizer, scheduler, and best_acc: {best_acc * 100:.2f}% from epoch {epoch_start_val-1}")
+            logging.info(f"Resumed optimizer, scheduler, and best_acc: {best_acc * 100:.2f}% from epoch {epoch_start_val-1}")
         else:
-            print("Optimizer/Scheduler state not found in checkpoint. Starting fresh.")
+            logging.info("Optimizer/Scheduler state not found in checkpoint. Starting fresh.")
 
 
     for epoch in range(epoch_start_val, args.epochs):
-        print(f'\nTrain Epoch: {epoch+1}/{args.epochs} | LR: {scheduler.get_last_lr()[0]:.6f}')
+        logging.info(f'\nTrain Epoch: {epoch+1}/{args.epochs} | LR: {scheduler.get_last_lr()[0]:.6f}')
         loss_meter = AvgMeter()
         acc_meter = AvgMeter()
 
-        with tqdm(total=len(train_loader), desc=f"Train Epoch {epoch+1}") as pbar:
+        with tqdm(total=len(train_loader), desc=f"Train Epoch {epoch+1}", file=sys.stdout) as pbar: # tqdm output to sys.stdout
             for batch_idx, (inputs, targets) in enumerate(train_loader):
                 inputs, targets = inputs.to(device), targets.to(device)
 
@@ -130,14 +129,14 @@ def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val
         is_best = current_acc > best_acc
         if is_best:
             best_acc = current_acc
-            print(f"New best accuracy: {best_acc * 100:.2f}%. Saving best model...")
+            logging.info(f"New best accuracy: {best_acc * 100:.2f}%. Saving best model...")
             # Ensure the directory exists before saving
             os.makedirs(save_dir, exist_ok=True)
             # When saving, save the state_dict which still includes _orig and _mask
             torch.save(model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict(), 
                        os.path.join(save_dir, 'best_model.pth'))
 
-        print("Saving latest checkpoint for resuming...")
+        logging.info("Saving latest checkpoint for resuming...")
         # Ensure the directory exists before saving
         os.makedirs(save_dir, exist_ok=True)
         state = {
@@ -149,7 +148,7 @@ def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val
         }
         torch.save(state, os.path.join(save_dir, 'latest_checkpoint.pth'))
 
-    print("--- Training complete ---")
+    logging.info("--- Training complete ---")
     return model
 
 # ==============================================================================
@@ -162,9 +161,9 @@ def test_model(model, test_loader, description="Test"):
     acc_meter = AvgMeter()
     criterion = nn.CrossEntropyLoss()
 
-    print(f"\n--- Starting {description} ---")
+    logging.info(f"\n--- Starting {description} ---")
     with torch.no_grad():
-        for image_batch, gt_batch in tqdm(test_loader, desc=description):
+        for image_batch, gt_batch in tqdm(test_loader, desc=description, file=sys.stdout): # tqdm output to sys.stdout
             image_batch, gt_batch = image_batch.to(device), gt_batch.to(device)
             pred_batch = model(image_batch)
             loss = criterion(pred_batch, gt_batch.long())
@@ -175,16 +174,16 @@ def test_model(model, test_loader, description="Test"):
     test_loss = loss_meter.avg
     test_acc = acc_meter.avg
 
-    print(f"--- {description} Result --- Loss: {test_loss:.4f}, Accuracy: {test_acc * 100:.2f}%")
+    logging.info(f"--- {description} Result --- Loss: {test_loss:.4f}, Accuracy: {test_acc * 100:.2f}%")
     return test_loss, test_acc
 
 # ==============================================================================
 # 通道剪枝（结构化 L1 norm）
 # ==============================================================================
 def structured_prune_conv_layers(model, amount=0.5):
-    print(f"\n==> Applying structured channel pruning (L1 norm) with amount={amount}")
+    logging.info(f"\n==> Applying structured channel pruning (L1 norm) with amount={amount}")
     if amount == 0:
-        print("  Skipping structured pruning as amount is 0.")
+        logging.info("  Skipping structured pruning as amount is 0.")
         return model
 
     for name, module in model.named_modules():
@@ -193,7 +192,7 @@ def structured_prune_conv_layers(model, amount=0.5):
             prune.ln_structured(module, name='weight', amount=amount, n=1, dim=0)
             # DO NOT CALL prune.remove() here to keep the pruned weights fixed at zero during fine-tuning.
 
-    print("  Structured pruning applied. Performing internal sparsity check...")
+    logging.info("  Structured pruning applied. Performing internal sparsity check...")
     for name, module in model.named_modules():
         if isinstance(module, nn.Conv2d):
             # Access the pruned weight through the reparametrization
@@ -202,7 +201,7 @@ def structured_prune_conv_layers(model, amount=0.5):
             total_elements = weight.numel()
             if total_elements > 0:
                 sparsity_percentage = (num_zeros / total_elements) * 100
-                print(f"    Layer: {name}, Structured Weight Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
+                logging.info(f"    Layer: {name}, Structured Weight Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
     return model
 
 
@@ -210,9 +209,9 @@ def structured_prune_conv_layers(model, amount=0.5):
 # 非结构化剪枝 (L1 norm)
 # ==============================================================================
 def unstructured_prune_weights(model, amount=0.5):
-    print(f"\n==> Applying unstructured weight pruning (L1 norm) with amount={amount}")
+    logging.info(f"\n==> Applying unstructured weight pruning (L1 norm) with amount={amount}")
     if amount == 0:
-        print("  Skipping unstructured pruning as amount is 0.")
+        logging.info("  Skipping unstructured pruning as amount is 0.")
         return model
 
     for name, module in model.named_modules():
@@ -220,7 +219,7 @@ def unstructured_prune_weights(model, amount=0.5):
             prune.l1_unstructured(module, name='weight', amount=amount)
             # DO NOT CALL prune.remove() here to keep the pruned weights fixed at zero during fine-tuning.
 
-    print("  Unstructured pruning applied. Performing internal sparsity check...")
+    logging.info("  Unstructured pruning applied. Performing internal sparsity check...")
     for name, module in model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             # Access the pruned weight through the reparametrization
@@ -229,18 +228,18 @@ def unstructured_prune_weights(model, amount=0.5):
             total_elements = weight.numel()
             if total_elements > 0:
                 sparsity_percentage = (num_zeros / total_elements) * 100
-                print(f"    Layer: {name}, Unstructured Weight Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
+                logging.info(f"    Layer: {name}, Unstructured Weight Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
     return model
 
 
 # ==============================================================================
-# 剪枝率计算 (更详细) - 适用于已固化或未剪枝的模型
+# 剪枝率计算 (更详细) - 适用于任何状态的模型
 # ==============================================================================
 def compute_total_sparsity(model):
     total_prunable_elements = 0 # sum of elements in weights of Conv2d/Linear layers
     zero_prunable_elements = 0  # sum of zero elements in weights of Conv2d/Linear layers
     
-    print("\n==> Layer-wise sparsity:")
+    logging.info("\n==> Layer-wise sparsity:")
     for name, module in model.named_modules():
         # Check if the module is a type that can be pruned (Conv2d or Linear)
         if isinstance(module, (nn.Conv2d, nn.Linear)):
@@ -256,7 +255,7 @@ def compute_total_sparsity(model):
                 zero_prunable_elements += current_zero_elements
 
                 layer_sparsity = (current_zero_elements / current_total_elements) * 100 if current_total_elements > 0 else 0
-                print(f"  {name}.weight: {layer_sparsity:.2f}% zeroed")
+                logging.info(f"  {name}.weight: {layer_sparsity:.2f}% zeroed")
             
             # Bias parameters are generally not pruned, but contribute to overall sparsity.
             # If you want to log bias sparsity per layer, uncomment below:
@@ -264,13 +263,13 @@ def compute_total_sparsity(model):
             #     bias_num_zeros = torch.sum(module.bias == 0).item()
             #     bias_total_elements = module.bias.numel()
             #     bias_sparsity = (bias_num_zeros / bias_total_elements) * 100 if bias_total_elements > 0 else 0
-            #     print(f"  {name}.bias: {bias_sparsity:.2f}% zeroed (Bias)")
+            #     logging.info(f"  {name}.bias: {bias_sparsity:.2f}% zeroed (Bias)")
         
     if total_prunable_elements > 0:
         overall_prunable_sparsity = zero_prunable_elements / total_prunable_elements
-        print(f"\n==> Overall sparsity for PRUNABLE weights (Conv2d & Linear): {overall_prunable_sparsity * 100:.2f}%")
+        logging.info(f"\n==> Overall sparsity for PRUNABLE weights (Conv2d & Linear): {overall_prunable_sparsity * 100:.2f}%")
     else:
-        print("\nNo prunable weights (Conv2d & Linear) found to calculate specific sparsity, or they have 0 elements.")
+        logging.info("\nNo prunable weights (Conv2d & Linear) found to calculate specific sparsity, or they have 0 elements.")
 
     # Calculate total model sparsity including ALL parameters (weights, biases, batchnorm, etc.)
     total_all_params = 0
@@ -280,7 +279,7 @@ def compute_total_sparsity(model):
         zero_all_params += torch.sum(param == 0).item()
         
     overall_model_sparsity = zero_all_params / total_all_params if total_all_params > 0 else 0
-    print(f"==> Total model sparsity (including ALL parameters): {overall_model_sparsity * 100:.2f}%")
+    logging.info(f"==> Total model sparsity (including ALL parameters): {overall_model_sparsity * 100:.2f}%")
     return overall_model_sparsity
 
 
@@ -299,6 +298,7 @@ def main():
     parser.add_argument('--unstructured_pruning_amount', default=0.9, type=float, help='amount for unstructured pruning (e.g., 0.9 for 90%)')
     parser.add_argument('--min_acc_drop', default=0.01, type=float, help='maximum allowed accuracy drop after pruning and finetuning')
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save fine-tuned model checkpoints and logs')
+    # Removed default for save_final_pruned_model_path here, will set dynamically
     parser.add_argument('--save_final_pruned_model_path', type=str, default=None, 
                         help='Optional: Path to save the final fine-tuned model after permanently applying pruning (removing _orig/_mask)')
 
@@ -306,11 +306,31 @@ def main():
 
     # Create the base output directory if it doesn't exist
     os.makedirs(args.output_dir, exist_ok=True)
+    
     # Create a timestamped subdirectory within the output_dir
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     finetuned_save_dir = os.path.join(args.output_dir, timestamp)
     os.makedirs(finetuned_save_dir, exist_ok=True)
-    print(f"All outputs (checkpoints, logs) will be saved in: {finetuned_save_dir}")
+
+    # --- Setup Logging ---
+    log_file_path = os.path.join(finetuned_save_dir, 'training_log.txt')
+    # Basic configuration for logging: INFO level, output to console and file
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout), # Output to console
+            logging.FileHandler(log_file_path) # Output to a file
+        ]
+    )
+    logging.info(f"All outputs (checkpoints, logs) will be saved in: {finetuned_save_dir}")
+    # --- End Setup Logging ---
+
+    # --- Set default for save_final_pruned_model_path ---
+    if args.save_final_pruned_model_path is None:
+        args.save_final_pruned_model_path = os.path.join(finetuned_save_dir, 'final_solidified_model.pth')
+        logging.info(f"Defaulting save_final_pruned_model_path to: {args.save_final_pruned_model_path}")
+    # --- End set default ---
 
     # 1. Load Data
     train_loader, test_loader = load_data(args)
@@ -318,7 +338,7 @@ def main():
     # 2. Load Pretrained ResNet20
     model = resnet20().to(device)
     
-    print(f"\nLoading pretrained model from: {args.pretrained_model_path}")
+    logging.info(f"\nLoading pretrained model from: {args.pretrained_model_path}")
     try:
         checkpoint = torch.load(args.pretrained_model_path, map_location=device)
         state_dict = checkpoint['net'] if 'net' in checkpoint else checkpoint # Handle different checkpoint formats
@@ -331,10 +351,10 @@ def main():
             else:
                 new_state_dict[k] = v # Keep as is
         model.load_state_dict(new_state_dict)
-        print("Pretrained model loaded successfully.")
+        logging.info("Pretrained model loaded successfully.")
     except Exception as e:
-        print(f"Error loading pretrained model from {args.pretrained_model_path}: {e}")
-        print("Please ensure the path is correct and the file is a valid PyTorch checkpoint.")
+        logging.error(f"Error loading pretrained model from {args.pretrained_model_path}: {e}")
+        logging.error("Please ensure the path is correct and the file is a valid PyTorch checkpoint.")
         exit() # Exit if pretrained model cannot be loaded
 
     model.eval()
@@ -344,7 +364,7 @@ def main():
 
     # Ensure the model is unwrapped from DataParallel before pruning
     if isinstance(model, nn.DataParallel):
-        print("Unwrapping model from DataParallel for pruning...")
+        logging.info("Unwrapping model from DataParallel for pruning...")
         model = model.module
 
     # 4. Apply Structured Pruning
@@ -357,18 +377,18 @@ def main():
 
     # 6. Verify that the pruning masks are active after application
     # This check is just for confirmation *before* fine-tuning.
-    print("\nVerifying pruning masks after application (before fine-tuning):")
+    logging.info("\nVerifying pruning masks after application (before fine-tuning):")
     for name, module in model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             if prune.is_pruned(module):
-                print(f"  Module {name} is pruned. Active weight sparsity: {(torch.sum(module.weight == 0).item() / module.weight.numel()) * 100:.2f}%")
+                logging.info(f"  Module {name} is pruned. Active weight sparsity: {(torch.sum(module.weight == 0).item() / module.weight.numel()) * 100:.2f}%")
             # else: # Uncomment to see modules not directly pruned by `torch.nn.utils.prune`
-            #     print(f"  Module {name} is NOT pruned by `torch.nn.utils.prune` mechanism (no mask).")
+            #     logging.info(f"  Module {name} is NOT pruned by `torch.nn.utils.prune` mechanism (no mask).")
     
     # 7. Fine-tune the pruned model
     # Wrap the model in DataParallel again for training if using CUDA
     if device == 'cuda':
-        print("\nWrapping model in DataParallel for fine-tuning...")
+        logging.info("\nWrapping model in DataParallel for fine-tuning...")
         model = torch.nn.DataParallel(model)
         cudnn.benchmark = True
     
@@ -384,13 +404,13 @@ def main():
     state_dict_finetuned = None
 
     if os.path.exists(finetuned_checkpoint_path):
-        print(f"\nLoading best_model.pth from {finetuned_checkpoint_path} for final evaluation.")
+        logging.info(f"\nLoading best_model.pth from {finetuned_checkpoint_path} for final evaluation.")
         state_dict_finetuned = torch.load(finetuned_checkpoint_path, map_location=device)
     else:
-        print(f"\nWarning: best_model.pth not found in {finetuned_save_dir}. Attempting to load latest_checkpoint.pth instead.")
+        logging.warning(f"\nWarning: best_model.pth not found in {finetuned_save_dir}. Attempting to load latest_checkpoint.pth instead.")
         finetuned_checkpoint_path = os.path.join(finetuned_save_dir, 'latest_checkpoint.pth')
         if os.path.exists(finetuned_checkpoint_path):
-            print("Loading latest_checkpoint.pth for final evaluation.")
+            logging.info("Loading latest_checkpoint.pth for final evaluation.")
             checkpoint_data = torch.load(finetuned_checkpoint_path, map_location=device)
             state_dict_finetuned = checkpoint_data['net'] # Assuming 'net' key holds the model state
         else:
@@ -405,24 +425,24 @@ def main():
             new_state_dict_finetuned[k] = v # Keep as is
     
     # Apply dummy pruning to final_model before loading state_dict to handle _orig/_mask
-    print("Applying dummy pruning to final_model to prepare for loading state_dict...")
+    logging.info("Applying dummy pruning to final_model to prepare for loading state_dict...")
     for name, module in final_model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             prune.l1_unstructured(module, name='weight', amount=0.01)
-    print("Dummy pruning applied to final_model.")
+    logging.info("Dummy pruning applied to final_model.")
 
     final_model.load_state_dict(new_state_dict_finetuned)
-    print("Fine-tuned model state_dict loaded successfully into final_model.")
+    logging.info("Fine-tuned model state_dict loaded successfully into final_model.")
 
 
     # --- NEW STEP: Permanently apply pruning to final_model ---
-    print("\n--- Permanently applying pruning to final_model (prune.remove()) ---")
+    logging.info("\n--- Permanently applying pruning to final_model (prune.remove()) ---")
     for name, module in final_model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             if prune.is_pruned(module):
                 prune.remove(module, 'weight')
-                # print(f"  Removed pruning reparametrization for {name}.weight") # Uncomment for detailed log
-    print("Pruning permanently applied to final_model.")
+                # logging.info(f"  Removed pruning reparametrization for {name}.weight") # Uncomment for detailed log
+    logging.info("Pruning permanently applied to final_model.")
     # --- END NEW STEP ---
 
     # Optional: Save the final model after integrating pruning
@@ -430,10 +450,10 @@ def main():
         os.makedirs(os.path.dirname(args.save_final_pruned_model_path), exist_ok=True)
         # Save the state_dict of the model AFTER prune.remove()
         torch.save(final_model.state_dict(), args.save_final_pruned_model_path)
-        print(f"\nFinal pruned model (weights solidified) saved to: {args.save_final_pruned_model_path}")
+        logging.info(f"\nFinal pruned model (weights solidified) saved to: {args.save_final_pruned_model_path}")
 
     # Verify sparsity of the loaded and now solidified `final_model` before evaluation
-    print("\nVerifying sparsity of the loaded and solidified final model:")
+    logging.info("\nVerifying sparsity of the loaded and solidified final model:")
     compute_total_sparsity(final_model) # This compute_total_sparsity function is compatible with solidified weights
     
     # Wrap the final_model in DataParallel for evaluation if using CUDA
@@ -445,14 +465,14 @@ def main():
 
     # 9. Accuracy Check
     acc_drop = base_acc - final_acc
-    print(f"\n==> Original Accuracy: {base_acc * 100:.2f}%")
-    print(f"==> Pruned & Finetuned (Solidified) Accuracy: {final_acc * 100:.2f}%")
-    print(f"==> Absolute Accuracy Drop: {acc_drop * 100:.2f}%")
+    logging.info(f"\n==> Original Accuracy: {base_acc * 100:.2f}%")
+    logging.info(f"==> Pruned & Finetuned (Solidified) Accuracy: {final_acc * 100:.2f}%")
+    logging.info(f"==> Absolute Accuracy Drop: {acc_drop * 100:.2f}%")
     
     # Optional assert based on your previous code, uncomment if needed
     # assert acc_drop < args.min_acc_drop, f"Accuracy drop ({acc_drop * 100:.2f}%) is too high! (Allowed: <{args.min_acc_drop * 100:.2f}%)"
 
-    print("\nPruning + Fine-tuning Complete!")
+    logging.info("\nPruning + Fine-tuning Complete!")
 
 
 if __name__ == '__main__':
