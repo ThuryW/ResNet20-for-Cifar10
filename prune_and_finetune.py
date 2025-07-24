@@ -1,104 +1,104 @@
-import argparse
-import time
 import os
-from tqdm import tqdm
-
 import torch
+from tqdm import tqdm
 import torch.nn as nn
-import torch.optim as optim
 import torch.backends.cudnn as cudnn
+import torch.optim as optim
 import torch.nn.utils.prune as prune
-
 import torchvision
 import torchvision.transforms as transforms
+from model.resnet import resnet20
+from train import train_model, test_model, load_data # Assuming 'train' module exists and contains these
 
-from model.resnet import resnet20 # 确保你的resnet20模型在这里定义
-from utils import AvgMeter # 确保你的AvgMeter工具函数在这里定义
+# Import datetime for timestamped directories
+from datetime import datetime
+import argparse # Import argparse
 
-# 配置设备
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class AvgMeter(object):
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def add(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count if self.count != 0 else 0
+
+# Configure device
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # ==============================================================================
-# 数据加载函数
+# Data Loading Function
 # ==============================================================================
 def load_data(args):
-    """
-    加载 CIFAR-10 训练集和测试集。
-    """
+    """Loads CIFAR-10 training and test datasets."""
     print('==> Preparing data..')
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=2)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=4)
 
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=2)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
     return trainloader, testloader
 
 # ==============================================================================
-# 剪枝函数
+# Training Function
 # ==============================================================================
-def prune_model(model, pruning_amount):
-    """
-    对模型进行非结构化剪枝。
-    使用 L1 非结构化剪枝方法，即根据权重绝对值大小进行剪枝。
-    """
-    print(f"\n--- Applying unstructured pruning with amount: {pruning_amount * 100:.2f}% ---")
+def train_model(model, train_loader, args, test_loader_for_eval, epoch_start_val=0, save_dir=None):
+    """Trains the model for specified epochs."""
+    print(f"\n--- Starting training for {args.epochs} total epochs ---")
+    model.train()
 
-    # 遍历模型的所有模块（层）
-    for name, module in model.named_modules():
-        # 我们只对 Conv2d 和 Linear 层的权重进行剪枝
-        if isinstance(module, (nn.Linear, nn.Conv2d)):
-            prune.l1_unstructured(module, name='weight', amount=pruning_amount)
-
-    # 打印剪枝后的稀疏度
-    total_elements = 0
-    zero_elements = 0
-    for name, module in model.named_modules():
-        if isinstance(module, (nn.Linear, nn.Conv2d)):
-            if hasattr(module, 'weight_mask'): 
-                total_elements += module.weight_mask.nelement()
-                zero_elements += torch.sum(module.weight_mask == 0)
-    actual_sparsity = (zero_elements / total_elements) * 100 if total_elements > 0 else 0
-    print(f"Model sparsity after pruning: {actual_sparsity:.2f}%")
-
-    return model
-
-# ==============================================================================
-# 微调函数
-# ==============================================================================
-def finetune_model(model, train_loader, args):
-    """
-    对剪枝后的模型进行微调。
-    """
-    print(f"\n--- Starting fine-tuning for {args.finetune_epochs} epochs ---")
-    model.train() # 设置为训练模式
-    
-    # 定义优化器和损失函数
-    optimizer = optim.SGD(model.parameters(), lr=args.finetune_lr, momentum=0.9, weight_decay=5e-4)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.finetune_epochs)
+    optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.1)
     criterion = nn.CrossEntropyLoss()
 
-    for epoch in range(args.finetune_epochs):
-        print(f'Finetune Epoch: {epoch+1}/{args.finetune_epochs}')
+    best_acc = 0
+    
+    # If resuming, load optimizer and scheduler states
+    if args.resume and args.resume_path:
+        print(f"Loading optimizer and scheduler states from {args.resume_path}")
+        checkpoint = torch.load(args.resume_path, map_location=device)
+        if 'optimizer' in checkpoint and 'scheduler' in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            scheduler.load_state_dict(checkpoint['scheduler'])
+            best_acc = checkpoint.get('acc', 0.0)
+            print(f"Resumed optimizer, scheduler, and best_acc: {best_acc * 100:.2f}%")
+        else:
+            print("Optimizer/Scheduler state not found in checkpoint. Starting fresh.")
+
+
+    for epoch in range(epoch_start_val, args.epochs):
+        print(f'\nTrain Epoch: {epoch+1}/{args.epochs} | LR: {scheduler.get_last_lr()[0]:.6f}')
         loss_meter = AvgMeter()
         acc_meter = AvgMeter()
-        
-        with tqdm(total=len(train_loader), desc=f"Finetune Epoch {epoch+1}") as pbar:
+
+        with tqdm(total=len(train_loader), desc=f"Train Epoch {epoch+1}") as pbar:
             for batch_idx, (inputs, targets) in enumerate(train_loader):
                 inputs, targets = inputs.to(device), targets.to(device)
-                
+
                 optimizer.zero_grad()
                 outputs = model(inputs)
                 loss = criterion(outputs, targets.long())
@@ -109,23 +109,44 @@ def finetune_model(model, train_loader, args):
                 acc = (outputs.argmax(dim=-1).long() == targets).float().mean()
                 acc_meter.add(acc.item(), inputs.size(0))
 
-                pbar.set_postfix({'loss': loss_meter.avg(), 'acc': acc_meter.avg() * 100})
+                pbar.set_postfix({'loss': loss_meter.avg, 'acc': f'{acc_meter.avg * 100:.2f}%'})
                 pbar.update(1)
 
         scheduler.step()
-        print(f"Finetune Epoch {epoch+1} finished. Loss: {loss_meter.avg():.4f}, Acc: {acc_meter.avg() * 100:.2f}%")
-    
-    print("--- Fine-tuning complete ---")
+        
+        # Evaluate after each epoch
+        current_loss, current_acc = test_model(model, test_loader_for_eval, f"Epoch {epoch+1} Test")
+        
+        # Save best model and latest checkpoint
+        is_best = current_acc > best_acc
+        if is_best:
+            best_acc = current_acc
+            print(f"New best accuracy: {best_acc * 100:.2f}%. Saving best model...")
+            # Ensure the directory exists before saving
+            os.makedirs(save_dir, exist_ok=True)
+            torch.save(model.state_dict(), os.path.join(save_dir, 'best_model.pth'))
+
+        print("Saving latest checkpoint for resuming...")
+        # Ensure the directory exists before saving
+        os.makedirs(save_dir, exist_ok=True)
+        state = {
+            'net': model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict(),
+            'acc': current_acc,
+            'epoch': epoch,
+            'optimizer': optimizer.state_dict(),
+            'scheduler': scheduler.state_dict(),
+        }
+        torch.save(state, os.path.join(save_dir, 'latest_checkpoint.pth'))
+
+    print("--- Training complete ---")
     return model
 
 # ==============================================================================
-# 测试函数 (与你之前的基本相同，但统一了模型加载逻辑)
+# Test Function
 # ==============================================================================
 def test_model(model, test_loader, description="Test"):
-    """
-    评估模型的性能。
-    """
-    model.eval() # 设置为评估模式
+    """Evaluates model performance."""
+    model.eval()
     loss_meter = AvgMeter()
     acc_meter = AvgMeter()
     criterion = nn.CrossEntropyLoss()
@@ -134,121 +155,171 @@ def test_model(model, test_loader, description="Test"):
     with torch.no_grad():
         for image_batch, gt_batch in tqdm(test_loader, desc=description):
             image_batch, gt_batch = image_batch.to(device), gt_batch.to(device)
-            gt_batch = gt_batch.long()
             pred_batch = model(image_batch)
-            loss = criterion(pred_batch, gt_batch)
+            loss = criterion(pred_batch, gt_batch.long())
             loss_meter.add(loss.item(), image_batch.size(0))
             acc = (pred_batch.argmax(dim=-1).long() == gt_batch).float().mean()
             acc_meter.add(acc.item(), image_batch.size(0))
-    test_loss = loss_meter.avg()
-    test_acc = acc_meter.avg()
+
+    test_loss = loss_meter.avg
+    test_acc = acc_meter.avg
 
     print(f"--- {description} Result --- Loss: {test_loss:.4f}, Accuracy: {test_acc * 100:.2f}%")
     return test_loss, test_acc
 
-# ==============================================================================
-# 保存模型函数
-# ==============================================================================
-def save_model(model, args, suffix="pruned_finetuned"):
-    """
-    保存剪枝微调后的模型。
-    """
-    save_dir = 'pruned_checkpoints'
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
-
-    # 移除剪枝相关的钩子和参数，将稀疏权重固化为实际权重
+# =====================
+# 通道剪枝（结构化）
+# =====================
+def structured_prune_conv_layers(model, amount=0.5):
+    print(f"\n==> Applying structured channel pruning (L1 norm) with amount={amount}")
     for name, module in model.named_modules():
-        if isinstance(module, (nn.Linear, nn.Conv2d)) and prune.is_pruned(module):
-            # 将 prune.remove_pruning 改为 prune.remove
+        if isinstance(module, nn.Conv2d):
+            prune.ln_structured(module, name='weight', amount=amount, n=1, dim=0)
             prune.remove(module, 'weight')
-    
-    # 如果模型是 DataParallel 包装的，保存其内部的 .module
-    if isinstance(model, nn.DataParallel):
-        state = {
-            'net': model.module.state_dict(),
-            'pruning_amount': args.prune_amount,
-            'finetune_epochs': args.finetune_epochs,
-            'test_acc': args.final_test_acc # 使用args.final_test_acc，因为test_acc不是全局变量
-        }
-    else:
-        state = {
-            'net': model.state_dict(),
-            'pruning_amount': args.prune_amount,
-            'finetune_epochs': args.finetune_epochs,
-            'test_acc': args.final_test_acc # 使用args.final_test_acc
-        }
-    
-    # 构造保存文件名
-    filename = f"resnet20_{suffix}_prune{int(args.prune_amount*100)}_ft{args.finetune_epochs:.0f}.pth" # 确保finetune_epochs格式化为整数
-    filepath = os.path.join(save_dir, filename)
-    
-    torch.save(state, filepath)
-    print(f"\nModel saved to: {filepath}")
-    
-# ==============================================================================
-# 主函数
-# ==============================================================================
-if __name__ == '__main__':
+    return model
+
+
+# =====================
+# 非结构化剪枝
+# =====================
+def unstructured_prune_weights(model, amount=0.5):
+    print(f"\n==> Applying unstructured weight pruning (L1 norm) with amount={amount}")
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
+            prune.l1_unstructured(module, name='weight', amount=amount)
+            prune.remove(module, 'weight')
+    return model
+
+
+# =====================
+# 剪枝率计算
+# =====================
+def compute_total_sparsity(model):
+    total_params = 0
+    zero_params = 0
+    for param in model.parameters():
+        total_params += param.numel()
+        zero_params += torch.sum(param == 0).item()
+    sparsity = zero_params / total_params
+    print(f"==> Total sparsity: {sparsity * 100:.2f}%")
+    return sparsity
+
+
+# =====================
+# 主流程
+# =====================
+def main():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Pruning and Fine-tuning')
-    parser.add_argument('--batch_size', default=128, type=int, help='batch size for data loaders')
-    parser.add_argument('--model_path', default='./checkpoint/20_ckpt_92.23.pth', type=str, help='path to original trained model checkpoint')
-    parser.add_argument('--prune_amount', default=0.5, type=float, help='Amount of unstructured pruning (0.0 to 1.0)')
-    parser.add_argument('--finetune_epochs', default=10, type=int, help='Number of epochs for fine-tuning after pruning')
-    parser.add_argument('--finetune_lr', default=0.01, type=float, help='Learning rate for fine-tuning')
+    parser.add_argument('--batch_size', default=512, type=int, help='batch size')
+    parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
+    parser.add_argument('--epochs', default=60, type=int, help='number of epochs to fine-tune')
+    parser.add_argument('--resume', action='store_true', help='resume from checkpoint')
+    parser.add_argument('--resume_path', default=None, type=str, help='path to latest checkpoint (if resume is true)')
+    parser.add_argument('--pretrained_model_path', default='/home/wangtianyu/my_resnet20/checkpoint/20_ckpt_92.23.pth', type=str, help='path to the pretrained model checkpoint')
+    parser.add_argument('--structured_pruning_amount', default=0.5, type=float, help='amount for structured pruning')
+    parser.add_argument('--unstructured_pruning_amount', default=0.8, type=float, help='amount for unstructured pruning')
+    parser.add_argument('--min_acc_drop', default=0.01, type=float, help='maximum allowed accuracy drop after pruning and finetuning')
+    
     args = parser.parse_args()
 
-    # 1. 加载数据
+    # 1. Load Data
     train_loader, test_loader = load_data(args)
 
-    # 2. 加载预训练模型
-    print(f"\n--- Loading pre-trained model from {args.model_path} ---")
-    net = resnet20()
-    net = net.to(device)
-
-    # 加载 checkpoint
-    checkpoint = torch.load(args.model_path)
-    state_dict = checkpoint['net']
+    # 2. Load Pretrained ResNet20
+    model = resnet20().to(device)
+    if device == 'cuda':
+        model = torch.nn.DataParallel(model)
+        cudnn.benchmark = True
     
-    # 处理 state_dict 的键，移除 'module.' 前缀（如果存在）
+    print(f"Loading pretrained model from: {args.pretrained_model_path}")
+    checkpoint = torch.load(args.pretrained_model_path, map_location=device)
+    state_dict = checkpoint['net']
     new_state_dict = {}
     for k, v in state_dict.items():
         if k.startswith('module.'):
-            new_state_dict[k[7:]] = v
+            new_state_dict[k[7:]] = v # 移除 'module.' 前缀
         else:
-            new_state_dict[k] = v
-    net.load_state_dict(new_state_dict)
+            new_state_dict[k] = v # 保持原样
+    # If the model itself is DataParallel, load state dict into its 'module' attribute
+    if isinstance(model, nn.DataParallel):
+        model.module.load_state_dict(new_state_dict)
+    else:
+        model.load_state_dict(new_state_dict)
+    model.eval()
 
-    # 如果要使用多GPU，在加载权重后包装
+    # 3. Evaluate original accuracy
+    _, base_acc = test_model(model, test_loader, description="Original Model")
+
+    # 4. Apply Structured Pruning
+    # Ensure the model is unwrapped from DataParallel before pruning
+    if isinstance(model, nn.DataParallel):
+        model = model.module
+    model = structured_prune_conv_layers(model, amount=args.structured_pruning_amount)
+
+    # 5. Apply Unstructured Pruning
+    model = unstructured_prune_weights(model, amount=args.unstructured_pruning_amount)
+
+    # 6. Calculate sparsity
+    sparsity = compute_total_sparsity(model)
+    # assert sparsity >= 0.90, "Sparsity not high enough!"
+
+    # 7. Fine-tune the pruned model
+    # Wrap the model in DataParallel again for training if using CUDA
     if device == 'cuda':
-        net = torch.nn.DataParallel(net)
+        model = torch.nn.DataParallel(model)
+        cudnn.benchmark = True
+    
+    # Create a timestamped directory for saving finetuned models
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    finetuned_save_dir = os.path.join('./autorun', timestamp)
+    os.makedirs(finetuned_save_dir, exist_ok=True)
+    print(f"Fine-tuned model checkpoints will be saved in: {finetuned_save_dir}")
+
+    finetuned_model = train_model(model, train_loader, args, test_loader, save_dir=finetuned_save_dir)
+
+    # 8. Evaluate finetuned model
+    final_model = resnet20().to(device)
+    
+    # Load the state dict from the best_model.pth in the timestamped directory
+    finetuned_checkpoint_path = os.path.join(finetuned_save_dir, 'best_model.pth')
+    if not os.path.exists(finetuned_checkpoint_path):
+        print(f"Warning: best_model.pth not found in {finetuned_save_dir}. Attempting to load latest_checkpoint.pth instead.")
+        finetuned_checkpoint_path = os.path.join(finetuned_save_dir, 'latest_checkpoint.pth')
+        if not os.path.exists(finetuned_checkpoint_path):
+            raise FileNotFoundError(f"Neither best_model.pth nor latest_checkpoint.pth found in {finetuned_save_dir}")
+        else:
+            print("Loading latest_checkpoint.pth for final evaluation.")
+            checkpoint_finetuned = torch.load(finetuned_checkpoint_path, map_location=device)
+            state_dict_finetuned = checkpoint_finetuned['net']
+    else:
+        print(f"Loading best_model.pth from {finetuned_save_dir} for final evaluation.")
+        state_dict_finetuned = torch.load(finetuned_checkpoint_path, map_location=device)
+
+    # Apply the same state_dict processing as the initial model loading
+    new_state_dict_finetuned = {}
+    for k, v in state_dict_finetuned.items():
+        if k.startswith('module.'):
+            new_state_dict_finetuned[k[7:]] = v # Remove 'module.' prefix
+        else:
+            new_state_dict_finetuned[k] = v # Keep as is
+            
+    # Load state dict into the final_model (which is not yet DataParallel)
+    final_model.load_state_dict(new_state_dict_finetuned)
+    
+    # Wrap the final_model in DataParallel for evaluation if using CUDA
+    if device == 'cuda':
+        final_model = torch.nn.DataParallel(final_model)
         cudnn.benchmark = True
 
-    # 3. 评估原始模型性能
-    print("\n--- Evaluating Original Model ---")
-    original_loss, original_acc = test_model(net, test_loader, "Original Model Test")
+    _, final_acc = test_model(final_model, test_loader, description="Pruned & Finetuned Model")
 
-    # 4. 应用剪枝
-    pruned_net = prune_model(net, args.prune_amount) # 注意：这里prune_model会修改传入的net对象
+    # 9. Accuracy Check
+    acc_drop = base_acc - final_acc
+    print(f"\n==> Accuracy drop: {acc_drop * 100:.2f}%")
+    # assert acc_drop < args.min_acc_drop, f"Accuracy drop ({acc_drop * 100:.2f}%) is too high! (Allowed: <{args.min_acc_drop * 100:.2f}%)"
 
-    # 5. 评估剪枝后（未微调）模型性能
-    print("\n--- Evaluating Pruned (before finetune) Model ---")
-    pruned_loss, pruned_acc = test_model(pruned_net, test_loader, "Pruned Model Test")
+    print("\nPruning + Fine-tuning Complete!")
 
-    # 6. 微调剪枝后的模型
-    finetuned_net = finetune_model(pruned_net, train_loader, args)
 
-    # 7. 评估微调后模型性能
-    print("\n--- Evaluating Fine-tuned Model ---")
-    final_loss, final_acc = test_model(finetuned_net, test_loader, "Fine-tuned Model Test")
-    test_acc = final_acc # 将最终精度赋值给test_acc，用于保存
-    # 将最终精度存储到args中，以便save_model函数访问
-    args.final_test_acc = final_acc 
-
-    # 8. 保存微调后的模型
-    save_model(finetuned_net, args, suffix="pruned_finetuned")
-
-    print("\n--- Pruning and Fine-tuning Process Complete ---")
-    print(f"Original Accuracy: {original_acc * 100:.2f}%")
-    print(f"Pruned (no finetune) Accuracy: {pruned_acc * 100:.2f}%")
-    print(f"Fine-tuned Accuracy: {final_acc * 100:.2f}%")
+if __name__ == '__main__':
+    main()

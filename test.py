@@ -45,7 +45,10 @@ def test_process(args, test_loader):
         cudnn.benchmark = True
 
     checkpoint = torch.load(args.path)
-    net.load_state_dict(checkpoint['net'])
+    net.load_state_dict(checkpoint)
+    # net.load_state_dict(checkpoint['net'])
+    # net.load_state_dict(checkpoint['state_dict'])
+    
     # best_epoch = checkpoint['epoch']
     # print('best epoch:', best_epoch)
 
