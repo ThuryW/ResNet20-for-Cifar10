@@ -7,3 +7,4 @@ train_tmp_ckpt/
 pruned_checkpoints/
 base_models/
 autorun_ckpt/
+*.jpg

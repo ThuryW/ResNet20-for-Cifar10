@@ -10,7 +10,6 @@ import torchvision.transforms as transforms
 
 from datetime import datetime
 import argparse
-import numpy as np # Import numpy for percentile calculation
 
 try:
     from model.resnet import resnet20
@@ -193,7 +192,7 @@ def compute_total_sparsity(model):
     return overall_model_sparsity
 
 # ==============================================================================
-# Global Pruning Functions (Unstructured and NEW Structured)
+# NEW: Global Pruning Functions
 # ==============================================================================
 
 def global_unstructured_prune(model, global_sparsity_target=0.8):
@@ -211,7 +210,12 @@ def global_unstructured_prune(model, global_sparsity_target=0.8):
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             if hasattr(module, 'weight') and module.weight is not None:
                 parameters_to_prune.append((module, 'weight'))
+            # If you want to prune biases too, uncomment the following:
+            # if hasattr(module, 'bias') and module.bias is not None:
+            #     parameters_to_prune.append((module, 'bias'))
 
+    # Apply global unstructured pruning based on the specified amount
+    # This will determine a global threshold and apply it to all specified parameters
     prune.global_unstructured(
         parameters_to_prune,
         pruning_method=prune.L1Unstructured,
@@ -220,7 +224,8 @@ def global_unstructured_prune(model, global_sparsity_target=0.8):
 
     print("  Global unstructured pruning applied. Performing internal sparsity check...")
     for module, name in parameters_to_prune:
-        weight = getattr(module, name)
+        # Access the pruned weight through the reparametrization
+        weight = getattr(module, name) # This will be the masked weight
         num_zeros = torch.sum(weight == 0).item()
         total_elements = weight.numel()
         if total_elements > 0:
@@ -228,124 +233,40 @@ def global_unstructured_prune(model, global_sparsity_target=0.8):
             print(f"    Layer: {module}, Parameter: {name}, Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
     return model
 
-def global_structured_prune_channels(model, global_sparsity_target=0.5):
-    """
-    Applies structured (channel) pruning globally across all Conv2d layers
-    to achieve a target sparsity for the entire model's convolutional output channels.
-    This implementation involves directly zeroing out channels after determining a global threshold.
-    """
-    print(f"\n==> Applying global structured channel pruning with target sparsity={global_sparsity_target}")
-    if global_sparsity_target == 0:
-        print("  Skipping global structured pruning as target sparsity is 0.")
-        return model
+# Note: Structured global pruning is more complex because `prune.ln_structured` operates on a single module at a time
+# and there isn't a direct `prune.global_structured` utility in PyTorch for arbitrary layers/dimensions.
+# If you need global structured pruning, you would typically:
+# 1. Collect the L1 norms (or other importance scores) of all *channels* across all Conv2d layers.
+# 2. Flatten these scores into a single list.
+# 3. Find the global threshold for channels that achieves the desired sparsity.
+# 4. Apply `prune.ln_structured` to each Conv2d layer with a calculated amount based on this global threshold.
+# This would require more manual calculation of `amount` per layer based on global statistics.
+# For simplicity, if global structured pruning is desired, it often involves custom logic
+# to calculate layer-specific `amount`s or using `prune.remove()` and then manually zeroing out channels
+# based on a global rank.
 
-    all_channel_l1_norms = []
-    prunable_conv_layers = []
-
-    # Collect L1 norms of output channels for all Conv2d layers
-    for name, module in model.named_modules():
-        if isinstance(module, nn.Conv2d):
-            # Calculate L1 norm for each output channel (dim=0)
-            # This sums the absolute values across input channels, kernel height, and kernel width
-            l1_norms = torch.norm(module.weight.data, p=1, dim=(1, 2, 3)) # (out_channels, in_channels, kH, kW)
-            all_channel_l1_norms.extend(l1_norms.detach().cpu().numpy())
-            prunable_conv_layers.append((name, module))
-
-    if not all_channel_l1_norms:
-        print("  No Conv2d layers found for structured pruning or no channels to prune.")
-        return model
-
-    # Calculate the global threshold
-    # Sort the L1 norms and find the value at the (global_sparsity_target) percentile
-    threshold_idx = int(len(all_channel_l1_norms) * global_sparsity_target)
-    # Ensure threshold_idx is within bounds
-    threshold_idx = min(threshold_idx, len(all_channel_l1_norms) - 1)
-    
-    # Use np.partition for efficiency if the list is large, otherwise sort is fine
-    # threshold = np.sort(all_channel_l1_norms)[threshold_idx]
-    threshold = np.partition(all_channel_l1_norms, threshold_idx)[threshold_idx]
-
-    print(f"  Calculated global L1 norm threshold for channels: {threshold:.6f}")
-
-    # Apply pruning based on the global threshold
-    total_channels_pruned = 0
-    total_channels_in_model = 0
-
-    for name, module in prunable_conv_layers:
-        l1_norms = torch.norm(module.weight.data, p=1, dim=(1, 2, 3))
-        
-        # Identify channels to prune (those whose L1 norm is below the global threshold)
-        channels_to_prune_mask = l1_norms <= threshold
-        
-        # Get the indices of channels to prune
-        channels_to_prune_indices = torch.nonzero(channels_to_prune_mask, as_tuple=True)[0]
-
-        num_channels_pruned_in_layer = len(channels_to_prune_indices)
-        total_channels_in_layer = module.weight.shape[0] # output channels
-        
-        # If no channels to prune in this layer, continue
-        if num_channels_pruned_in_layer == 0:
-            print(f"    Layer: {name} - No channels pruned (0/{total_channels_in_layer})")
-            continue
-
-        # Manually set the weights of these channels to zero
-        # This effectively prunes the output channels
-        with torch.no_grad():
-            module.weight[channels_to_prune_indices] = 0.0
-
-        total_channels_pruned += num_channels_pruned_in_layer
-        total_channels_in_model += total_channels_in_layer
-
-        layer_pruning_percentage = (num_channels_pruned_in_layer / total_channels_in_layer) * 100
-        print(f"    Layer: {name}, Channels Pruned: {num_channels_pruned_in_layer}/{total_channels_in_layer} ({layer_pruning_percentage:.2f}%)")
-    
-    overall_structured_sparsity = (total_channels_pruned / total_channels_in_model) * 100 if total_channels_in_model > 0 else 0
-    print(f"\n  Global structured pruning applied. Overall channel sparsity: {overall_structured_sparsity:.2f}% ({total_channels_pruned}/{total_channels_in_model} channels).")
-
-    # Important: Since we manually zeroed out, there are no _orig and _mask.
-    # So, `prune.is_pruned()` will return False, and `prune.remove()` is not needed for these.
-    # The `compute_total_sparsity` function will correctly count these zeros.
-
-    return model
-
-# Override the structured_prune_conv_layers with a placeholder or remove it,
-# as the new global structured pruning function will handle it.
-# def structured_prune_conv_layers(model, amount=0.5):
-#     print(f"\n==> Applying structured channel pruning (L1 norm) with amount={amount}")
-#     if amount == 0:
-#         print("  Skipping structured pruning as amount is 0.")
-#         return model
-#
-#     for name, module in model.named_modules():
-#         if isinstance(module, nn.Conv2d):
-#             prune.ln_structured(module, name='weight', amount=amount, n=1, dim=0)
-#
-#     print("  Structured pruning applied. Performing internal sparsity check...")
-#     for name, module in model.named_modules():
-#         if isinstance(module, nn.Conv2d):
-#             weight = getattr(module, 'weight')
-#             num_zeros = torch.sum(weight == 0).item()
-#             total_elements = weight.numel()
-#             if total_elements > 0:
-#                 sparsity_percentage = (num_zeros / total_elements) * 100
-#                 print(f"    Layer: {name}, Structured Weight Sparsity: {sparsity_percentage:.2f}% ({num_zeros}/{total_elements})")
-#     return model
+# Your original structured pruning functions can still be used if you want to apply
+# a fixed percentage to *each* layer's channels, but that's not "global target sparsity".
+# For the purpose of achieving an overall sparsity with layer-wise varying rates,
+# global unstructured pruning is the most straightforward approach with `torch.nn.utils.prune`.
 
 
 def main():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Pruning and Fine-tuning')
-    parser.add_argument('--batch_size', default=512, type=int, help='batch size')
+    parser.add_argument('--batch_size', default=256, type=int, help='batch size')
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
     parser.add_argument('--epochs', default=300, type=int, help='number of epochs to fine-tune')
     parser.add_argument('--resume', action='store_true', help='resume from checkpoint')
     parser.add_argument('--resume_path', default=None, type=str, help='path to latest checkpoint (if resume is true)')
     parser.add_argument('--pretrained_model_path', default='/home/wangtianyu/my_resnet20/base_models/20_ckpt_92.23.pth', type=str, help='path to the pretrained model checkpoint')
     
-    # Global pruning arguments
-    parser.add_argument('--global_unstructured_sparsity', default=0.7, type=float, # Changed default to 0.0
+    # NEW ARGUMENT for GLOBAL sparsity
+    parser.add_argument('--global_unstructured_sparsity', default=0.8, type=float, 
                         help='Target global unstructured sparsity for the model (e.g., 0.8 for 80% total zeros)')
-    parser.add_argument('--global_structured_sparsity', default=0.05, type=float, # NEW ARGUMENT
-                        help='Target global structured (channel) sparsity for Conv2d layers (e.g., 0.5 for 50% channels zeroed)')
+    # You can keep this if you want to combine it with global unstructured,
+    # but it will apply a fixed percentage per layer, not contribute to global structured sparsity.
+    parser.add_argument('--structured_pruning_amount_per_layer', default=0.0, type=float, 
+                        help='Amount for structured pruning applied individually to each conv layer (0.0 means no structured pruning)')
     
     parser.add_argument('--min_acc_drop', default=0.01, type=float, help='maximum allowed accuracy drop after pruning and finetuning')
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save fine-tuned model checkpoints and logs')
@@ -390,33 +311,18 @@ def main():
         print("Unwrapping model from DataParallel for pruning...")
         model = model.module
 
-    # Apply Global Structured Pruning first (as it directly modifies weights)
-    # This comes before unstructured pruning because structured pruning affects the 'shape' of weights
-    # (by making channels zero, which then influences unstructured pruning on remaining non-zero weights).
-    model = global_structured_prune_channels(model, global_sparsity_target=args.global_structured_sparsity)
+    # Apply individual layer structured pruning if specified (this is not globally controlled)
+    # model = structured_prune_conv_layers(model, amount=args.structured_pruning_amount_per_layer)
     
-    # Apply Global Unstructured Pruning
+    # NEW: Apply Global Unstructured Pruning
     model = global_unstructured_prune(model, global_sparsity_target=args.global_unstructured_sparsity)
 
-    print("\nVerifying pruning masks and zeros after all pruning applications (before fine-tuning):")
-    # For unstructured pruning, prune.is_pruned() will be True.
-    # For structured pruning (manual zeroing), prune.is_pruned() will be False, but compute_total_sparsity will count zeros.
+    print("\nVerifying pruning masks after application (before fine-tuning):")
     for name, module in model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             if prune.is_pruned(module):
-                # This check is for `torch.nn.utils.prune` applied masks
-                print(f"  Module {name} is pruned (via mask). Active weight sparsity: {(torch.sum(module.weight == 0).item() / module.weight.numel()) * 100:.2f}%")
-            else:
-                # This covers modules where channels were manually zeroed (structured pruning) or not pruned by `torch.nn.utils.prune`
-                current_weight = module.weight
-                num_zeros = torch.sum(current_weight == 0).item()
-                total_elements = current_weight.numel()
-                if total_elements > 0:
-                    sparsity_percentage = (num_zeros / total_elements) * 100
-                    if sparsity_percentage > 0: # Only print if there's actual sparsity
-                        print(f"  Module {name} has direct zeros (possibly structured). Active weight sparsity: {sparsity_percentage:.2f}%")
-
-    # Re-wrap the model in DataParallel for training if using CUDA
+                print(f"  Module {name} is pruned. Active weight sparsity: {(torch.sum(module.weight == 0).item() / module.weight.numel()) * 100:.2f}%")
+    
     if device == 'cuda':
         print("\nWrapping model in DataParallel for fine-tuning...")
         model = torch.nn.DataParallel(model)
@@ -424,7 +330,6 @@ def main():
     
     finetuned_model = train_model(model, train_loader, args, test_loader, save_dir=finetuned_save_dir)
 
-    # --- Final Model Loading and Solidification ---
     final_model = resnet20().to(device)
     
     finetuned_checkpoint_path = os.path.join(finetuned_save_dir, 'best_model.pth')
@@ -450,15 +355,11 @@ def main():
         else:
             new_state_dict_finetuned[k] = v
     
-    # IMPORTANT: Apply a small dummy unstructured pruning to `final_model` before loading state_dict
-    # This ensures that `_orig` and `_mask` parameters are created if the loaded state_dict
-    # contains them (which it will if `global_unstructured_prune` was used).
-    # Structured pruning (manual zeroing) does not create these, so it's fine.
-    print("Applying dummy pruning to final_model to prepare for loading state_dict for unstructured pruning layers...")
+    # Apply dummy pruning to final_model before loading state_dict to handle _orig/_mask
+    print("Applying dummy pruning to final_model to prepare for loading state_dict...")
     for name, module in final_model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
-            # Only apply dummy pruning if it was likely unstructured pruned in training
-            # A small amount (e.g., 0.0001) is sufficient to create the reparameterization
+            # Use a tiny amount for dummy pruning to ensure the _orig and _mask parameters are created.
             prune.l1_unstructured(module, name='weight', amount=0.0001) 
     print("Dummy pruning applied to final_model.")
 
@@ -469,18 +370,16 @@ def main():
     for name, module in final_model.named_modules():
         if isinstance(module, (nn.Conv2d, nn.Linear)):
             if prune.is_pruned(module):
-                # This removes _orig and _mask for unstructured pruning, making weights permanent.
                 prune.remove(module, 'weight')
     print("Pruning permanently applied to final_model.")
 
     if args.save_final_pruned_model_path:
         os.makedirs(os.path.dirname(args.save_final_pruned_model_path), exist_ok=True)
-        # Save the state_dict of the model AFTER prune.remove()
         torch.save(final_model.state_dict(), args.save_final_pruned_model_path)
         print(f"\nFinal pruned model (weights solidified) saved to: {args.save_final_pruned_model_path}")
 
     print("\nVerifying sparsity of the loaded and solidified final model:")
-    compute_total_sparsity(final_model) # This compute_total_sparsity function is compatible with solidified weights
+    compute_total_sparsity(final_model)
     
     if device == 'cuda':
         final_model = torch.nn.DataParallel(final_model)
