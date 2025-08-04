@@ -2,11 +2,13 @@ import torch.nn as nn
 import torch.nn.init as init
 import torch.nn.functional as F
 
+
 def _weights_init(m):
     classname = m.__class__.__name__
     #print(classname)
     if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
         init.kaiming_normal_(m.weight)
+
 
 class LambdaLayer(nn.Module):
     def __init__(self, lambd):
@@ -24,8 +26,10 @@ class BasicBlock(nn.Module):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
+        self.relu1 = nn.ReLU() # 新增：第一个 ReLU 模块
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(planes)
+        self.relu2 = nn.ReLU() # 新增：第二个 ReLU 模块 (final ReLU in block)
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
@@ -34,7 +38,7 @@ class BasicBlock(nn.Module):
                 For CIFAR10 ResNet paper uses option A.
                 """
                 self.shortcut = LambdaLayer(lambda x:
-                                            F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes//4, planes//4), "constant", 0))
+                                            F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes // 4, planes // 4), "constant", 0))
             elif option == 'B':
                 self.shortcut = nn.Sequential(
                      nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
@@ -42,10 +46,18 @@ class BasicBlock(nn.Module):
                 )
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += self.shortcut(x)
-        out = F.relu(out)
+        pre_x = x # Save input to the block for shortcut
+        
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu1(out) # Apply first ReLU module
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out += self.shortcut(pre_x) # Add shortcut connection
+
+        out = self.relu2(out) # Apply second ReLU module (final in block)
         return out
 
 
@@ -56,6 +68,7 @@ class ResNet(nn.Module):
 
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
+        self.relu_initial = nn.ReLU() # 新增：ResNet 模块的初始 ReLU
         self.layer1 = self._make_layer(block, 16, num_blocks[0], stride=1)
         self.layer2 = self._make_layer(block, 32, num_blocks[1], stride=2)
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2)
@@ -73,7 +86,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
+        out = self.relu_initial(self.bn1(self.conv1(x))) # 使用 self.relu_initial
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
@@ -85,24 +98,3 @@ class ResNet(nn.Module):
 
 def resnet20():
     return ResNet(BasicBlock, [3, 3, 3])
-
-def resnet32():
-    return ResNet(BasicBlock, [5, 5, 5])
-
-
-def resnet44():
-    return ResNet(BasicBlock, [7, 7, 7])
-
-
-def resnet56():
-    return ResNet(BasicBlock, [9, 9, 9])
-
-
-def resnet110():
-    return ResNet(BasicBlock, [18, 18, 18])
-
-
-def resnet1202():
-    return ResNet(BasicBlock, [200, 200, 200])
-
-

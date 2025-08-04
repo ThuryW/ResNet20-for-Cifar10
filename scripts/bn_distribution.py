@@ -24,17 +24,17 @@ def visualize_bn_distributions(args):
     # 确保保存目录存在
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # 实例化 ResNet20 模型
     model = resnet20()
-    
-    # 加载预训练权重
     try:
-        model.load_state_dict(torch.load(args.pth_file_path, map_location=torch.device('cpu')))
-        print(f"成功加载模型权重：{args.pth_file_path}")
+        checkpoint = torch.load(args.pth_file_path, map_location=torch.device('cpu'))
+        state_dict = checkpoint.get('net', checkpoint)
+        new_state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        model.load_state_dict(new_state_dict)
+        print(f"Successfully loaded model weights: {args.pth_file_path}")
     except Exception as e:
-        print(f"加载模型权重失败：{e}")
-        print("请确保你的 .pth 文件与 ResNet20 模型结构匹配。")
-        return
+        print(f"Failed to load model weights: {e}")
+        print("Please ensure your .pth file matches the ResNet20 model structure.")
+        return None
 
     model.eval() # 设置为评估模式，这将关闭 BN 层的训练模式（即使用均值和方差）
 
@@ -129,12 +129,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Visualize Batch Normalization layer distributions in ResNet20.')
 
     parser.add_argument('--pth_file_path', type=str, 
-                        default="/home/wangtianyu/my_resnet20/base_models/20_ckpt_91.39_usp0.75.pth",
+                        default="/home/wangtianyu/relu_finetune/base_models/20_ckpt_92.23.pth",
                         help='Path to the .pth model file.')
     parser.add_argument('--batch_size', type=int, default=512,
                         help='Input batch size for data loading.')
     parser.add_argument('--save_dir', type=str, 
-                        default="/home/wangtianyu/my_resnet20/hook/bn_distribution",
+                        default="/home/wangtianyu/relu_finetune/hook/bn_distribution",
                         help='Directory to save the distribution images.')
     parser.add_argument('--data_dir', type=str, default="./data",
                         help='Directory to store CIFAR-10 dataset.')

@@ -10,7 +10,6 @@ import torchvision
 import torchvision.transforms as transforms
 
 from model.resnet import *
-from model.squeezeNet import *
 from utils import AvgMeter
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -45,8 +44,8 @@ def test_process(args, test_loader):
         cudnn.benchmark = True
 
     checkpoint = torch.load(args.path)
-    net.load_state_dict(checkpoint)
-    # net.load_state_dict(checkpoint['net'])
+    # net.load_state_dict(checkpoint)
+    net.load_state_dict(checkpoint['net'])
     # net.load_state_dict(checkpoint['state_dict'])
     
     # best_epoch = checkpoint['epoch']
@@ -81,7 +80,7 @@ def test_result(start_time, test_loss, test_acc):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'PyTorch CIFAR10 Test')
     parser.add_argument('--batch_size', default = 512, type = int, help = 'test batch size')
-    parser.add_argument('--path', default = '/home/wangtianyu/my_resnet20/checkpoint/20_ckpt_92.23.pth', type = str, help = 'test model path')
+    parser.add_argument('--path', default = '/home/wangtianyu/relu_finetune/base_models/20_ckpt_92.23.pth', type = str, help = 'test model path')
     args = parser.parse_args()
 
     test_loader, subset_loader = load_test_data(args)

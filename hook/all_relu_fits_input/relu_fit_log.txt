@@ -1,0 +1,106 @@
+2025-08-04 15:15:16,875 - --- ReLU Input Polynomial Fitting Log ---
+2025-08-04 15:15:16,875 - Model Path: /home/wangtianyu/relu_finetune/base_models/20_ckpt_91.39_usp0.75.pth
+2025-08-04 15:15:16,875 - Batch Size: 512
+2025-08-04 15:15:16,876 - Data Directory: ./data
+2025-08-04 15:15:16,876 - Base Save Directory: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input
+2025-08-04 15:15:16,876 - Polynomial Order: 31
+
+2025-08-04 15:15:26,865 - --- Processing ReLU Layer: relu_initial (Channels: 16) ---
+2025-08-04 15:15:26,866 -   Input Range: [-3.7842, 3.7660], Fitted MSE: 0.000024, Poly Order: 31
+2025-08-04 15:15:26,867 -   Created subdirectory for relu_initial: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/relu_initial
+2025-08-04 15:15:29,175 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/relu_initial/relu_initial_relu_fit.jpg
+2025-08-04 15:15:35,757 -   Saved combined ReLU fit plot for relu_initial to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/relu_initial_combined_relu_fits.jpg
+2025-08-04 15:15:36,961 - --- Processing ReLU Layer: layer1.0.relu1 (Channels: 16) ---
+2025-08-04 15:15:36,961 -   Input Range: [-4.0829, 3.9943], Fitted MSE: 0.000028, Poly Order: 31
+2025-08-04 15:15:36,962 -   Created subdirectory for layer1.0.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu1
+2025-08-04 15:15:39,158 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu1/layer1_0_relu1_relu_fit.jpg
+2025-08-04 15:15:45,983 -   Saved combined ReLU fit plot for layer1.0.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu1_combined_relu_fits.jpg
+2025-08-04 15:15:46,660 - --- Processing ReLU Layer: layer1.0.relu2 (Channels: 16) ---
+2025-08-04 15:15:46,660 -   Input Range: [-3.6604, 5.2233], Fitted MSE: 0.000031, Poly Order: 31
+2025-08-04 15:15:46,660 -   Created subdirectory for layer1.0.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu2
+2025-08-04 15:15:49,001 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu2/layer1_0_relu2_relu_fit.jpg
+2025-08-04 15:15:54,865 -   Saved combined ReLU fit plot for layer1.0.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_0_relu2_combined_relu_fits.jpg
+2025-08-04 15:15:55,561 - --- Processing ReLU Layer: layer1.1.relu1 (Channels: 16) ---
+2025-08-04 15:15:55,561 -   Input Range: [-4.6499, 4.2107], Fitted MSE: 0.000030, Poly Order: 31
+2025-08-04 15:15:55,562 -   Created subdirectory for layer1.1.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu1
+2025-08-04 15:15:57,686 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu1/layer1_1_relu1_relu_fit.jpg
+2025-08-04 15:16:03,302 -   Saved combined ReLU fit plot for layer1.1.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu1_combined_relu_fits.jpg
+2025-08-04 15:16:03,930 - --- Processing ReLU Layer: layer1.1.relu2 (Channels: 16) ---
+2025-08-04 15:16:03,930 -   Input Range: [-3.2263, 5.1969], Fitted MSE: 0.000032, Poly Order: 31
+2025-08-04 15:16:03,930 -   Created subdirectory for layer1.1.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu2
+2025-08-04 15:16:06,005 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu2/layer1_1_relu2_relu_fit.jpg
+2025-08-04 15:16:12,129 -   Saved combined ReLU fit plot for layer1.1.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_1_relu2_combined_relu_fits.jpg
+2025-08-04 15:16:12,721 - --- Processing ReLU Layer: layer1.2.relu1 (Channels: 16) ---
+2025-08-04 15:16:12,721 -   Input Range: [-4.8303, 4.2774], Fitted MSE: 0.000032, Poly Order: 31
+2025-08-04 15:16:12,721 -   Created subdirectory for layer1.2.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu1
+2025-08-04 15:16:14,853 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu1/layer1_2_relu1_relu_fit.jpg
+2025-08-04 15:16:20,610 -   Saved combined ReLU fit plot for layer1.2.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu1_combined_relu_fits.jpg
+2025-08-04 15:16:21,223 - --- Processing ReLU Layer: layer1.2.relu2 (Channels: 16) ---
+2025-08-04 15:16:21,223 -   Input Range: [-3.0662, 4.9480], Fitted MSE: 0.000029, Poly Order: 31
+2025-08-04 15:16:21,224 -   Created subdirectory for layer1.2.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu2
+2025-08-04 15:16:23,378 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu2/layer1_2_relu2_relu_fit.jpg
+2025-08-04 15:16:29,505 -   Saved combined ReLU fit plot for layer1.2.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer1_2_relu2_combined_relu_fits.jpg
+2025-08-04 15:16:29,832 - --- Processing ReLU Layer: layer2.0.relu1 (Channels: 32) ---
+2025-08-04 15:16:29,832 -   Input Range: [-3.3372, 3.3145], Fitted MSE: 0.000019, Poly Order: 31
+2025-08-04 15:16:29,832 -   Created subdirectory for layer2.0.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu1
+2025-08-04 15:16:31,062 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu1/layer2_0_relu1_relu_fit.jpg
+2025-08-04 15:16:39,854 -   Saved combined ReLU fit plot for layer2.0.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu1_combined_relu_fits.jpg
+2025-08-04 15:16:40,156 - --- Processing ReLU Layer: layer2.0.relu2 (Channels: 32) ---
+2025-08-04 15:16:40,156 -   Input Range: [-3.8689, 6.4333], Fitted MSE: 0.000048, Poly Order: 31
+2025-08-04 15:16:40,156 -   Created subdirectory for layer2.0.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu2
+2025-08-04 15:16:41,401 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu2/layer2_0_relu2_relu_fit.jpg
+2025-08-04 15:16:50,242 -   Saved combined ReLU fit plot for layer2.0.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_0_relu2_combined_relu_fits.jpg
+2025-08-04 15:16:50,553 - --- Processing ReLU Layer: layer2.1.relu1 (Channels: 32) ---
+2025-08-04 15:16:50,553 -   Input Range: [-3.5182, 2.7439], Fitted MSE: 0.000016, Poly Order: 31
+2025-08-04 15:16:50,553 -   Created subdirectory for layer2.1.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu1
+2025-08-04 15:16:51,733 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu1/layer2_1_relu1_relu_fit.jpg
+2025-08-04 15:17:00,147 -   Saved combined ReLU fit plot for layer2.1.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu1_combined_relu_fits.jpg
+2025-08-04 15:17:00,452 - --- Processing ReLU Layer: layer2.1.relu2 (Channels: 32) ---
+2025-08-04 15:17:00,452 -   Input Range: [-3.5814, 7.5646], Fitted MSE: 0.000066, Poly Order: 31
+2025-08-04 15:17:00,453 -   Created subdirectory for layer2.1.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu2
+2025-08-04 15:17:01,630 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu2/layer2_1_relu2_relu_fit.jpg
+2025-08-04 15:17:10,268 -   Saved combined ReLU fit plot for layer2.1.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_1_relu2_combined_relu_fits.jpg
+2025-08-04 15:17:10,573 - --- Processing ReLU Layer: layer2.2.relu1 (Channels: 32) ---
+2025-08-04 15:17:10,573 -   Input Range: [-3.9155, 4.7925], Fitted MSE: 0.000032, Poly Order: 31
+2025-08-04 15:17:10,574 -   Created subdirectory for layer2.2.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu1
+2025-08-04 15:17:11,748 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu1/layer2_2_relu1_relu_fit.jpg
+2025-08-04 15:17:19,458 -   Saved combined ReLU fit plot for layer2.2.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu1_combined_relu_fits.jpg
+2025-08-04 15:17:19,760 - --- Processing ReLU Layer: layer2.2.relu2 (Channels: 32) ---
+2025-08-04 15:17:19,760 -   Input Range: [-4.0920, 9.0603], Fitted MSE: 0.000096, Poly Order: 31
+2025-08-04 15:17:19,761 -   Created subdirectory for layer2.2.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu2
+2025-08-04 15:17:21,106 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu2/layer2_2_relu2_relu_fit.jpg
+2025-08-04 15:17:28,945 -   Saved combined ReLU fit plot for layer2.2.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer2_2_relu2_combined_relu_fits.jpg
+2025-08-04 15:17:29,122 - --- Processing ReLU Layer: layer3.0.relu1 (Channels: 64) ---
+2025-08-04 15:17:29,122 -   Input Range: [-3.7945, 5.1597], Fitted MSE: 0.000030, Poly Order: 31
+2025-08-04 15:17:29,122 -   Created subdirectory for layer3.0.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu1
+2025-08-04 15:17:29,861 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu1/layer3_0_relu1_relu_fit.jpg
+2025-08-04 15:17:43,794 -   Saved combined ReLU fit plot for layer3.0.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu1_combined_relu_fits.jpg
+2025-08-04 15:17:43,957 - --- Processing ReLU Layer: layer3.0.relu2 (Channels: 64) ---
+2025-08-04 15:17:43,957 -   Input Range: [-7.3328, 13.0452], Fitted MSE: 0.000198, Poly Order: 31
+2025-08-04 15:17:43,957 -   Created subdirectory for layer3.0.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu2
+2025-08-04 15:17:44,691 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu2/layer3_0_relu2_relu_fit.jpg
+2025-08-04 15:18:00,431 -   Saved combined ReLU fit plot for layer3.0.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_0_relu2_combined_relu_fits.jpg
+2025-08-04 15:18:00,592 - --- Processing ReLU Layer: layer3.1.relu1 (Channels: 64) ---
+2025-08-04 15:18:00,592 -   Input Range: [-3.8667, 4.1995], Fitted MSE: 0.000025, Poly Order: 31
+2025-08-04 15:18:00,592 -   Created subdirectory for layer3.1.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu1
+2025-08-04 15:18:01,328 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu1/layer3_1_relu1_relu_fit.jpg
+2025-08-04 15:18:16,336 -   Saved combined ReLU fit plot for layer3.1.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu1_combined_relu_fits.jpg
+2025-08-04 15:18:16,489 - --- Processing ReLU Layer: layer3.1.relu2 (Channels: 64) ---
+2025-08-04 15:18:16,490 -   Input Range: [-11.5757, 14.5430], Fitted MSE: 0.000279, Poly Order: 31
+2025-08-04 15:18:16,490 -   Created subdirectory for layer3.1.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu2
+2025-08-04 15:18:17,230 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu2/layer3_1_relu2_relu_fit.jpg
+2025-08-04 15:18:32,571 -   Saved combined ReLU fit plot for layer3.1.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_1_relu2_combined_relu_fits.jpg
+2025-08-04 15:18:32,729 - --- Processing ReLU Layer: layer3.2.relu1 (Channels: 64) ---
+2025-08-04 15:18:32,729 -   Input Range: [-7.4781, 5.9524], Fitted MSE: 0.000074, Poly Order: 31
+2025-08-04 15:18:32,729 -   Created subdirectory for layer3.2.relu1: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu1
+2025-08-04 15:18:33,471 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu1/layer3_2_relu1_relu_fit.jpg
+2025-08-04 15:18:49,088 -   Saved combined ReLU fit plot for layer3.2.relu1 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu1_combined_relu_fits.jpg
+2025-08-04 15:18:49,247 - --- Processing ReLU Layer: layer3.2.relu2 (Channels: 64) ---
+2025-08-04 15:18:49,248 -   Input Range: [-20.8289, 58.1877], Fitted MSE: 0.003163, Poly Order: 31
+2025-08-04 15:18:49,248 -   Created subdirectory for layer3.2.relu2: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu2
+2025-08-04 15:18:50,017 -   Saved individual ReLU fit plot to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu2/layer3_2_relu2_relu_fit.jpg
+2025-08-04 15:19:07,294 -   Saved combined ReLU fit plot for layer3.2.relu2 to /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/layer3_2_relu2_combined_relu_fits.jpg
+2025-08-04 15:19:07,295 - 
+All polynomial coefficients and info saved to: /home/wangtianyu/relu_finetune/hook/all_relu_fits_input/relu_poly_coeffs.json
+2025-08-04 15:19:07,295 - 
+--- ReLU Input Polynomial Fitting Complete ---
