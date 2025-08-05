@@ -314,7 +314,7 @@ if __name__ == "__main__":
     parser.add_argument('--save_dir', type=str, 
                         default="/home/wangtianyu/relu_finetune/hook/all_relu_fits_input", 
                         help='Base directory to save the plots, log file, and polynomial coefficients.')
-    parser.add_argument('--poly_order', type=int, default=31,
+    parser.add_argument('--poly_order', type=int, default=63,
                         help='Order of the polynomial to fit the ReLU function.')
 
     args = parser.parse_args()
