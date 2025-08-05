@@ -8,3 +8,4 @@ pruned_checkpoints/
 base_models/
 autorun_ckpt/
 *.jpg
+*.png
