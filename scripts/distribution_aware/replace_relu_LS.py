@@ -142,7 +142,7 @@ if __name__ == "__main__":
                         default="/home/wangtianyu/relu_finetune/base_models/20_ckpt_92.23.pth",
                         help='Path to the .pth model file.')
     parser.add_argument('--poly_coeffs_path', type=str,
-                        default="/home/wangtianyu/relu_finetune/hook/all_relu_fits_input/relu_poly_coeffs.json",
+                        default="/home/wangtianyu/relu_finetune/hook/all_relu_fits_input_LS/relu_poly_coeffs.json",
                         help='Path to the JSON file containing polynomial coefficients.')
     parser.add_argument('--batch_size', type=int, default=512,
                         help='Batch size for data loading.')

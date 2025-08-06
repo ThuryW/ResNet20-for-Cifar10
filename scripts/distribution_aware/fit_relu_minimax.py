@@ -259,9 +259,9 @@ if __name__ == "__main__":
                         default="/home/wangtianyu/relu_finetune/hook/minimax_composite_relu_all_layers",
                         help='Root directory to save fit plots and coefficients.')
     
-    parser.add_argument('--degree_f1', type=int, default=27,
+    parser.add_argument('--degree_f1', type=int, default=31,
                         help='Degree of the first polynomial f1.')
-    parser.add_argument('--degree_f2', type=int, default=15,
+    parser.add_argument('--degree_f2', type=int, default=31,
                         help='Degree of the second polynomial f2.')
     
     parser.add_argument('--num_fit_points', type=int, default=5000,
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     parser.add_argument('--optimizer_method', type=str, default='Nelder-Mead',
                         help='Optimization method for scipy.optimize.minimize. '
                              'Options: "Nelder-Mead", "Powell", "SLSQP", "L-BFGS-B" (try others if one fails).')
-    parser.add_argument('--max_iterations', type=int, default=10000,
+    parser.add_argument('--max_iterations', type=int, default=20000,
                         help='Maximum number of iterations for the optimizer.')
 
 
