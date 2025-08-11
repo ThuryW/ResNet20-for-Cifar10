@@ -46,20 +46,22 @@ def get_relu_input_distributions_per_channel(pth_file_path, batch_size, data_dir
         print("❌ 未在模型中找到任何 nn.ReLU 层。请检查模型结构。")
         return
 
-    # 3. 加载 CIFAR-10 测试数据集
+    # 3. 加载 CIFAR-10 训练数据集 (修改部分)
     transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ])
-    testset = torchvision.datasets.CIFAR10(root=data_dir, train=False, download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
+    # 将 train=False 修改为 train=True
+    trainset = torchvision.datasets.CIFAR10(root=data_dir, train=True, download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    print(f"🚀 开始使用 CIFAR-10 数据集进行前向传播以捕获所有 ReLU 层输入...")
+    print(f"🚀 开始使用 CIFAR-10 训练数据集进行前向传播以捕获所有 ReLU 层输入...")
     with torch.no_grad():
-        for i, (inputs, labels) in enumerate(testloader):
+        # 将 testloader 替换为 trainloader
+        for i, (inputs, labels) in enumerate(trainloader):
             _ = model(inputs)
             if (i + 1) % 100 == 0:
-                print(f"  Processed {i + 1}/{len(testloader)} batches.")
+                print(f"  Processed {i + 1}/{len(trainloader)} batches.")
 
     print("✅ 前向传播完成，所有 ReLU 层的输入数据已捕获。")
 
@@ -99,19 +101,13 @@ def get_relu_input_distributions_per_channel(pth_file_path, batch_size, data_dir
             f_txt.write("\n")
             
             # --- 可视化：每个通道一个子图 ---
-            # 计算子图布局
-            # 常见通道数有16, 32, 64等，可以选择4x4, 4x8, 8x8等布局
-            # 自动调整布局，使其尽可能接近正方形
             cols = int(np.ceil(np.sqrt(num_channels)))
             rows = int(np.ceil(num_channels / cols))
 
-            # 确定一个全局的x轴范围，以便所有子图的横坐标一致
-            # 可以使用所有通道数据的全局最小和最大值
-            x_min_all = global_min - abs(global_min * 0.1) # 增加一些裕度
+            x_min_all = global_min - abs(global_min * 0.1)
             x_max_all = global_max + abs(global_max * 0.1)
             
             fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 3 * rows))
-            # 将axes展平，方便迭代
             axes = axes.flatten()
 
             for c in range(num_channels):
@@ -119,20 +115,17 @@ def get_relu_input_distributions_per_channel(pth_file_path, batch_size, data_dir
                 channel_data = all_inputs[:, c, :, :].numpy().flatten()
                 ax.hist(channel_data, bins=100, color='blue', alpha=0.7)
                 ax.set_title(f'Channel {c}', fontsize=8)
-                ax.set_yscale('log') # 使用对数坐标
+                ax.set_yscale('log')
                 ax.tick_params(axis='both', which='major', labelsize=6)
                 ax.grid(True, linestyle='--', alpha=0.6)
-                # 统一x轴范围
                 ax.set_xlim(x_min_all, x_max_all)
 
-            # 隐藏多余的子图
             for i in range(num_channels, len(axes)):
                 fig.delaxes(axes[i])
             
             plt.suptitle(f'ReLU Input Distribution for Layer: {name} (Total Channels: {num_channels})', fontsize=12)
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # 调整布局以适应suptitle
+            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-            # 保存图片
             save_filename = os.path.join(images_dir, f'relu_input_distribution_{name.replace(".", "_")}.png')
             plt.savefig(save_filename, dpi=200)
             plt.close()
@@ -140,7 +133,6 @@ def get_relu_input_distributions_per_channel(pth_file_path, batch_size, data_dir
     
     print(f"\n💾 所有 ReLU 层的输入范围信息已保存到 {txt_path}")
     print("\n--- 脚本执行完毕 ---")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Analyze and visualize the input distributions of all ReLU layers in a ResNet20 model.')
@@ -152,10 +144,9 @@ if __name__ == "__main__":
     parser.add_argument('--data_dir', type=str, default="./data",
                         help='Directory to store CIFAR-10 dataset.')
     parser.add_argument('--save_dir', type=str, 
-                        default="/home/wangtianyu/relu_finetune/hook/relu_distributions_per_channel",
+                        default="/home/wangtianyu/relu_finetune/hook/relu_distributions_per_channel_trainset", # 建议修改保存目录以区分
                         help='Directory to save the distribution plots and text files.')
     
     args = parser.parse_args()
 
-    # 运行分析和可视化
     get_relu_input_distributions_per_channel(args.pth_file_path, args.batch_size, args.data_dir, args.save_dir)
