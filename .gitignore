@@ -1,11 +1,9 @@
 data/
 weights*/
-checkpoint/
 __pycache__/
 hook_files/
-train_tmp_ckpt/
-pruned_checkpoints/
+*checkpoints/
 base_models/
-autorun_ckpt/
 *.jpg
 *.png
+*_ckpt/

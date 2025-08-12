@@ -39,13 +39,21 @@ def load_test_data(args):
 def test_process(args, test_loader):
     net = resnet20()
     net = net.to(device)
-    if device == 'cuda':
-        net = torch.nn.DataParallel(net)
-        cudnn.benchmark = True
+    # if device == 'cuda':
+    #     net = torch.nn.DataParallel(net)
+    #     cudnn.benchmark = True
 
-    checkpoint = torch.load(args.path)
-    # net.load_state_dict(checkpoint)
-    net.load_state_dict(checkpoint['net'])
+    checkpoint = torch.load(args.path, map_location=device)
+    state_dict = checkpoint['net'] if 'net' in checkpoint else checkpoint # Handle different checkpoint formats
+
+    # Adjust state_dict keys for potential DataParallel prefix
+    # new_state_dict = {}
+    # for k, v in state_dict.items():
+    #     if k.startswith('module.'):
+    #         new_state_dict[k[7:]] = v # Remove 'module.' prefix
+    #     else:
+    #         new_state_dict[k] = v # Keep as is
+    net.load_state_dict(state_dict)
     # net.load_state_dict(checkpoint['state_dict'])
     
     # best_epoch = checkpoint['epoch']
