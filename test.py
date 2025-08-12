@@ -47,13 +47,13 @@ def test_process(args, test_loader):
     state_dict = checkpoint['net'] if 'net' in checkpoint else checkpoint # Handle different checkpoint formats
 
     # Adjust state_dict keys for potential DataParallel prefix
-    # new_state_dict = {}
-    # for k, v in state_dict.items():
-    #     if k.startswith('module.'):
-    #         new_state_dict[k[7:]] = v # Remove 'module.' prefix
-    #     else:
-    #         new_state_dict[k] = v # Keep as is
-    net.load_state_dict(state_dict)
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k.startswith('module.'):
+            new_state_dict[k[7:]] = v # Remove 'module.' prefix
+        else:
+            new_state_dict[k] = v # Keep as is
+    net.load_state_dict(new_state_dict)
     # net.load_state_dict(checkpoint['state_dict'])
     
     # best_epoch = checkpoint['epoch']
